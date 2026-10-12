@@ -452,7 +452,6 @@ Laden: `SOURCE /work/sql/live/06_02_auto_id.sql;`
 > Eine erfolgreiche Änderung ist sofort gespeichert (Autocommit). Es
 > gibt keinen Rückgängig-Knopf. Transaktionen folgen an Tag 2.
 
-**[Quiz 2 starten][quiz-2]** – Abfragen, Filter und Datenänderungen.
 
 ## 7. Gültige Werte absichern
 
@@ -649,7 +648,7 @@ Laden: `SOURCE /work/sql/live/09_03_error_foreign_key.sql;`
 > - Dieselbe Kombination aus Schüler und Kurs ist noch doppelt
 >   buchbar. Diese Regel folgt später.
 
-**[Quiz 3 starten][quiz-3]** – Normalisierung und Beziehungen.
+
 
 ## 10. Buchungsfragen beantworten
 
