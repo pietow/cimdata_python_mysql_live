@@ -10,7 +10,7 @@ def main():
     try:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT DATABASE(), CURRENT_USER()")
+                cursor.execute("SELECT DATABASE(), CURRENT_USER()") # 
         
                 row = cursor.fetchone()
                 print(row)
