@@ -28,4 +28,4 @@ engine = create_engine(
     connect_args={"connection_timeout": 5}
 )
 
-SessionLocal = sessionmaker(binde=engine)  # Session factory
+SessionLocal = sessionmaker(bind=engine)  # Session factory
