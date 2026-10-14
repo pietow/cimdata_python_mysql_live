@@ -5,7 +5,7 @@ from models import Course
 engine.echo = True
 try:
     with SessionLocal() as session:
-        course = session.get(Course, 999)
+        course = session.get(Course, 3)
         if course is None:
             print('Nicht gefunden')
         else:
