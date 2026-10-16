@@ -1,0 +1,1312 @@
+{
+  "info": {
+    "name": "Tag 5 – Hogwarts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Manuelle Unterrichtsrequests für Tag 5. Die Requests einzeln zum jeweiligen Unterrichtsschritt senden. Zuerst Methode, URL, Params und Body erklären, danach Status, Headers und Antwort prüfen. Pflicht- und Bonusvarianten auf Port 8001 einzeln starten. POST und DELETE verändern den Speicher; Neustart oder Reload setzt ihn zurück. Nicht die gesamte Collection auf einmal ausführen: Bonusvarianten und Erwartungswerte brauchen unterschiedliche App-Stände. pytest prüft die App unabhängig davon im eigenen Prozess."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "practice_url",
+      "value": "http://127.0.0.1:8001",
+      "type": "string"
+    },
+    {
+      "key": "reports_url",
+      "value": "http://127.0.0.1:8002",
+      "type": "string"
+    },
+    {
+      "key": "created_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "created_student_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "empty_course_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Kurse",
+      "description": "Einzeln zum passenden Unterrichtsschritt senden. ",
+      "item": [
+        {
+          "name": "Health prüfen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Body: {\"status\":\"ok\"}. Ab Abschnitt 2."
+          },
+          "response": []
+        },
+        {
+          "name": "Alle Kurse lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nach frischem Start fünf Kurse. Ab Abschnitt 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Alte Runen lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/3",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "3"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Objekt mit ID 3 und Titel Alte Runen."
+          },
+          "response": []
+        },
+        {
+          "name": "Arithmantik lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Objekt mit ID 1 und Titel Arithmantik."
+          },
+          "response": []
+        },
+        {
+          "name": "Fehlende Kurs-ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Keine Ressource unter dieser ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Text als Kurs-ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/AlteRunen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "AlteRunen"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Pfadparameter muss ein Integer sein."
+          },
+          "response": []
+        },
+        {
+          "name": "Runen suchen – Großschreibung",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=RUNEN",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "RUNEN"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Liste mit Alte Runen. Ab Abschnitt 5."
+          },
+          "response": []
+        },
+        {
+          "name": "Runen suchen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=runen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "runen"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Liste mit Alte Runen."
+          },
+          "response": []
+        },
+        {
+          "name": "Suche ohne Treffer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=Quidditch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Quidditch"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Leere Liste []."
+          },
+          "response": []
+        },
+        {
+          "name": "Leerer Suchwert",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Alle vorhandenen Kurse als Liste."
+          },
+          "response": []
+        },
+        {
+          "name": "Unbekannter Pfad",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/unknown",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "unknown"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Keine Route unter diesem Pfad."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE ohne Implementierung",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/3",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "3"
+              ]
+            },
+            "description": "Erwarteter Status: 405. Pflichtstand: kein DELETE; Bestand bleibt unverändert."
+          },
+          "response": []
+        },
+        {
+          "name": "Astronomie anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 201. Ab Abschnitt 6. Jeder Klick auf Send legt einen weiteren Kurs an. Die Antwort-ID wird in created_course_id gespeichert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Astronomie\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"created_course_id\", pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Angelegten Kurs lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/{{created_course_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "{{created_course_id}}"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Zuerst Astronomie anlegen senden. Nach Neustart ist die zuvor erzeugte Ressource gelöscht; POST erneut senden."
+          },
+          "response": []
+        },
+        {
+          "name": "Kurs ohne Pflichtfeld",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Vorher und nachher Alle Kurse lesen: Die Zahl bleibt gleich.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Kurs mit leerem Titel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Titel benötigt mindestens ein Zeichen. Die Zahl der Kurse bleibt gleich.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 Schüler – Pflicht",
+      "description": "Einzeln zum passenden Unterrichtsschritt senden. ",
+      "item": [
+        {
+          "name": "Health prüfen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/health",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Body: {\"status\":\"ok\",\"school\":\"Hogwarts\"}. Ab Aufgabe 2."
+          },
+          "response": []
+        },
+        {
+          "name": "Alle Schüler lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nach frischem Start sechs Schüler. Ab Aufgabe 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Luna lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/14",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Luna Lovegood, Ravenclaw, Schuljahr 2."
+          },
+          "response": []
+        },
+        {
+          "name": "Harry lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/11",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "11"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Harry Potter, Gryffindor, Schuljahr 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Fehlende Schüler-ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/999",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Schüler nicht gefunden."
+          },
+          "response": []
+        },
+        {
+          "name": "Text als Schüler-ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/Luna",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "Luna"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Pfadparameter muss ein Integer sein."
+          },
+          "response": []
+        },
+        {
+          "name": "Gryffindor filtern",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=gryffindor",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "gryffindor"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nach Start IDs 11, 12, 15 und 16. Ab Aufgabe 4."
+          },
+          "response": []
+        },
+        {
+          "name": "Ravenclaw filtern",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Ravenclaw",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Ravenclaw"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nach Start Luna; nach Cho-Anlage außerdem Cho."
+          },
+          "response": []
+        },
+        {
+          "name": "Hausname als Teilwort",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Gryff",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Gryff"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Leere Liste: Ganze Hausnamen werden verglichen."
+          },
+          "response": []
+        },
+        {
+          "name": "Haus ohne Treffer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Durmstrang",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Durmstrang"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Leere Liste []."
+          },
+          "response": []
+        },
+        {
+          "name": "Unbekannter Pfad",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/unknown",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "unknown"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Keine Route unter diesem Pfad."
+          },
+          "response": []
+        },
+        {
+          "name": "Cho anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 201. Ab Aufgabe 6. Jeder Klick auf Send legt einen weiteren Schüler an. Die Antwort-ID wird in created_student_id gespeichert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"created_student_id\", pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Angelegten Schüler lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/{{created_student_id}}",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "{{created_student_id}}"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Zuerst Cho anlegen senden. Nach Neustart POST erneut senden."
+          },
+          "response": []
+        },
+        {
+          "name": "Schüler ohne Pflichtfelder",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Vorher und nachher Alle Schüler lesen: Die Zahl bleibt gleich.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ungültiges Schuljahr",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Schuljahr 8 ist ungültig. Die Schülerzahl bleibt gleich.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE ohne Implementierung",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/11",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "11"
+              ]
+            },
+            "description": "Erwarteter Status: 405. Nur mit tag5.practice:app prüfen. Die Bonus-App implementiert DELETE."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 Bonus – Hausbericht",
+      "description": "Einzeln zum passenden Unterrichtsschritt senden. Bonus: Bisherigen Server auf Port 8001 stoppen und die passende Bonusvariante frisch starten.",
+      "item": [
+        {
+          "name": "Schülerzahlen nach Haus",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/reports/students-by-house",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "reports",
+                "students-by-house"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nur tag5.practice_counts:app auf Port 8001 starten. Nach Start Gryffindor 4, Ravenclaw 1, Slytherin 1."
+          },
+          "response": []
+        },
+        {
+          "name": "Cho anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 201. Danach Hausbericht erneut senden: Ravenclaw 2.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"created_student_id\", pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Schüler ohne Haus anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 201. Danach Hausbericht erneut senden: Eine zusätzliche Gruppe mit house: null erscheint.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Alex\",\n  \"last_name\": \"Morgan\",\n  \"school_year\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"created_student_id\", pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Bonus – DELETE",
+      "description": "Einzeln zum passenden Unterrichtsschritt senden. Bonus: Bisherigen Server auf Port 8001 stoppen und die passende Bonusvariante frisch starten.",
+      "item": [
+        {
+          "name": "Draco löschen – erster Aufruf",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/13",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "13"
+              ]
+            },
+            "description": "Erwarteter Status: 204. Nur tag5.practice_delete:app frisch starten. Genau ein Schüler wird entfernt; Antwort-Body leer."
+          },
+          "response": []
+        },
+        {
+          "name": "Draco nach Löschung lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/13",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "13"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Zuerst Draco löschen – erster Aufruf senden."
+          },
+          "response": []
+        },
+        {
+          "name": "Draco löschen – zweiter Aufruf",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/13",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "13"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Nach erstem DELETE erneut senden. Draco bleibt gelöscht."
+          },
+          "response": []
+        },
+        {
+          "name": "Restliche Schüler lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nach genau einer Löschung fünf Schüler im frischen Bestand."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 Bonus – Tag-4-Berichte",
+      "description": "Einzeln zum passenden Unterrichtsschritt senden. ",
+      "item": [
+        {
+          "name": "Kursbuchungen lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{reports_url}}/reports/course-bookings",
+              "host": [
+                "{{reports_url}}"
+              ],
+              "path": [
+                "reports",
+                "course-bookings"
+              ]
+            },
+            "description": "Erwarteter Status: 200. tag5.report_api:app auf Port 8002 und MySQL starten. Fünf Kurse, davon Zaubertrankpraxis mit 0. Bei SQLAlchemyError: 503."
+          },
+          "response": []
+        },
+        {
+          "name": "Teilnehmer Wahrsagen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{reports_url}}/courses/2/participants",
+              "host": [
+                "{{reports_url}}"
+              ],
+              "path": [
+                "courses",
+                "2",
+                "participants"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Harry und Ron mit Buchungsdaten; Datum als ISO-Zeichenkette. Bei SQLAlchemyError: 503."
+          },
+          "response": []
+        },
+        {
+          "name": "Teilnehmer leerer Kurs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{reports_url}}/courses/{{empty_course_id}}/participants",
+              "host": [
+                "{{reports_url}}"
+              ],
+              "path": [
+                "courses",
+                "{{empty_course_id}}",
+                "participants"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Zuerst Kursbuchungen lesen: Tatsächliche course_id von Zaubertrankpraxis in der Collection-Variable empty_course_id eintragen. Keine Speicher-ID raten. Antwort []."
+          },
+          "response": []
+        },
+        {
+          "name": "Teilnehmer fehlender Kurs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{reports_url}}/courses/999/participants",
+              "host": [
+                "{{reports_url}}"
+              ],
+              "path": [
+                "courses",
+                "999",
+                "participants"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Unbekannte ID im Live-Bestand. Bei SQLAlchemyError: 503."
+          },
+          "response": []
+        },
+        {
+          "name": "Text als Kurs-ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{reports_url}}/courses/AlteRunen/participants",
+              "host": [
+                "{{reports_url}}"
+              ],
+              "path": [
+                "courses",
+                "AlteRunen",
+                "participants"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Pfadparameter muss ein Integer sein."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
