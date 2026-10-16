@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from tag5.data import courses
 from tag5.schemas import CourseCreate, CourseRead
 
-app = FastAPI(title="Hogwarts-Kursverwaltung")
+app = FastAPI(title="Hogwarts-Kursverwaltung", description="Lern-API mit vorübergehendem Speicherstand.", version="0.1.0")
 
 course_ids = count(6)
 
@@ -14,7 +14,7 @@ def read_health():
     return {"status": "ok"}
 
 @app.get("/courses", response_model=list[CourseRead])
-def read_courses(q: str | None ):
+def read_courses(q: str | None = None ):
     rows = [courses[key] for key in courses ]
     if q is not None:
         rows = [row for row in rows if
