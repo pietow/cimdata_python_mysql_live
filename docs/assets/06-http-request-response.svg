@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1360" height="760" viewBox="0 0 1360 760"
+     role="img" aria-labelledby="title desc">
+  <title id="title">HTTP-Anfrage und Antwort für Hogwarts</title>
+  <desc id="desc">
+    Ein Client sendet GET courses 3 an Uvicorn und FastAPI.
+    Die App liest den Speicherbestand und liefert Status 200 mit JSON.
+    Bei einer unbekannten ID liefert sie stattdessen Status 404.
+  </desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10"
+            refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#334155"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 23px; fill: #172033; }
+    .title { font-size: 32px; font-weight: bold; }
+    .head { font-size: 26px; font-weight: bold; }
+    .small { font-size: 20px; }
+    .box { fill: #f1f5f9; stroke: #475569; stroke-width: 2; }
+    .arrow { fill: none; stroke: #334155; stroke-width: 3; }
+    .note { fill: #fff7df; stroke: #c79628; stroke-width: 2; }
+  </style>
+  <rect width="1360" height="760" fill="white"/>
+  <text x="45" y="55" class="title">HTTP-Anfrage und Antwort</text>
+  <text x="45" y="91" class="small">
+    Beispiel: Die Verwaltung möchte den Kurs mit ID 3 lesen.
+  </text>
+  <rect x="45" y="150" width="280" height="300" rx="12" class="box"/>
+  <text x="70" y="193" class="head">Client</text>
+  <text x="70" y="240">Browser</text>
+  <text x="70" y="280">Swagger UI</text>
+  <text x="70" y="320">Postman</text>
+  <text x="70" y="411" class="small">Methode + URL</text>
+  <rect x="605" y="150" width="310" height="300" rx="12" class="box"/>
+  <text x="630" y="193" class="head">Server</text>
+  <text x="630" y="242">Uvicorn</text>
+  <text x="630" y="282">FastAPI-Routing</text>
+  <text x="630" y="322">read_course(3)</text>
+  <text x="630" y="411" class="small">Status + JSON-Body</text>
+  <rect x="1015" y="205" width="300" height="190" rx="12" class="box"/>
+  <text x="1040" y="250" class="head">Speicherbestand</text>
+  <text x="1040" y="294">id: 3</text>
+  <text x="1040" y="334">title: Alte Runen</text>
+  <path d="M 335 225 H 590" class="arrow" marker-end="url(#arrow)"/>
+  <text x="350" y="190" class="head">Anfrage</text>
+  <text x="350" y="265">GET /courses/3</text>
+  <path d="M 590 365 H 340" class="arrow" marker-end="url(#arrow)"/>
+  <text x="350" y="337" class="head">Antwort</text>
+  <text x="350" y="410">200 + JSON</text>
+  <path d="M 925 295 H 999" class="arrow" marker-end="url(#arrow)"/>
+  <rect x="45" y="510" width="1270" height="115" rx="12" class="box"/>
+  <text x="70" y="552" class="head">Antwort im Detail</text>
+  <text x="70" y="595">Status: 200</text>
+  <text x="355" y="595">Content-Type: application/json</text>
+  <text x="840" y="595">
+    {&quot;id&quot;:3,&quot;title&quot;:&quot;Alte Runen&quot;}
+  </text>
+  <rect x="45" y="660" width="1270" height="65" rx="10" class="note"/>
+  <text x="70" y="702" class="small">
+    Unbekannte ID: 404. Ungültige ID: 422. Speicher ist hier keine Datenbank.
+  </text>
+</svg>
