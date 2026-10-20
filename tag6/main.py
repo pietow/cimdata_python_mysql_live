@@ -30,9 +30,14 @@ def read_course(course_id: Annotated[int, Path(ge=1)]):
     return course
 
 
-@app.post("/courses", response_model=CourseCreate, status_code=201)
-def create_course(course: CourseCreate):
+@app.post("/courses", response_model=CourseRead, status_code=201)
+def create_course(course: CourseCreate): # Bei Fehler in CourseCreate.model_validate(body.json) wird create_course nicht aufgerufen
     course_id = next(course_ids)
-    created = {"id": course_id, "title": course.title}
+    created = {
+            "id": course_id, 
+            "title": course.title, 
+            "internal_note": "hardcoded",
+        }
     courses[course_id] = created
+    print('COURSES: ', courses)
     return created
