@@ -40,6 +40,7 @@ def test_create_and_filter_response():
         #assert list(created.keys()) == ['id', 'title']
         assert set(created) == {"id", 'title'}
         stored = courses[created["id"]]
+        # Antwortfilter bzw. Antwortschema wird geprüft
         assert stored['internal_note'] == 'hardcoded'
     finally:
         courses.pop(created["id"], None)
