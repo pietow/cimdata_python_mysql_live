@@ -20,7 +20,9 @@ def read_courses(q: Annotated[str | None, Query(min_length=2, max_length=100, de
 
 @router.get("/count", response_model=CourseCount)
 def read_course_count():
-    return {"count": len(courses)}
+    # return {"count": -1} # Internal Server Error; 5xx heißt, dass der Server eine falsche Antwort geliefert hat
+    return {'count': len(courses)}
+
 
 @router.get("/{course_id}", response_model=CourseRead)
 def read_course(course_id: Annotated[int, Path(ge=1)]):
