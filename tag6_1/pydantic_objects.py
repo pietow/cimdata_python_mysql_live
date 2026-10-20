@@ -6,8 +6,8 @@ from schemas import CourseCreate, CourseRead
 
 
 if __name__ == "__main__":
-    first = CourseCreate(title="Alte Runen")
-    second = CourseCreate(title="Flugkunde")
+    # first = CourseCreate(title="Alte Runen")
+    # second = CourseCreate(title="Flugkunde")
 
 
     body = json.loads('{"title": "Alte Runen"}')
