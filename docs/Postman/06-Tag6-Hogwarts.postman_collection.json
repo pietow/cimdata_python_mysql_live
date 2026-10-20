@@ -1,0 +1,3084 @@
+{
+  "info": {
+    "name": "Tag 6 – Hogwarts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Begleitende Requests zu Routing und Validierung. Ordner 00 gilt ausschließlich für den unveränderten Startstand aus Tag 5; Ordner 01 für den fertigen Kursstand, 02 für die Schülerübungen. Ordner 03 und 04 benötigen jeweils eine andere Bonus-App auf demselben Port 8002. Nicht die gesamte Collection auf einmal ausführen. Ordnerläufe beginnen mit frischem passenden Serverbestand;POST-IDs werden aus der Antwort übernommen. Bei einem Neustart die Anlage erneut ausführen. pytest bleibt die automatische Codeprüfung; Postman macht Requests und Antworten sichtbar."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "practice_url",
+      "value": "http://127.0.0.1:8001",
+      "type": "string"
+    },
+    {
+      "key": "bonus_url",
+      "value": "http://127.0.0.1:8002",
+      "type": "string"
+    },
+    {
+      "key": "created_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "created_student_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Startstand aus Tag 5",
+      "description": "Nur mit dem unveränderten Startmaterial aus Abschnitt 0 auf Port 8000 verwenden. Der problematische POST liefert hier noch 201. Danach Server stoppen und neu starten. Dieser Ordner gehört nicht zum fertigen Tag-6-Stand.",
+      "item": [
+        {
+          "name": "Health prüfen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Der Server ist erreichbar."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alle Kurse lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Frischer Bestand: fünf Kurse."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alte Runen lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/3",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "3"
+              ]
+            },
+            "description": "Erwarteter Status: 200. ID 3: Alte Runen."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"id\": 3, \"title\": \"Alte Runen\"}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlenden Kurs lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Gültige ID, aber kein Kurs vorhanden."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Problematischen Body zulassen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 201. Startstand: Leerzeichen werden gespeichert; id wird ignoriert und vom Server vergeben. Anschließend neu starten.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"   \",\n  \"id\": 42\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Kurse – Pflicht",
+      "description": "Fertiger Kursstand: python -m uvicorn tag6.main:app --reload --host 127.0.0.1 --port 8000. Einzelne Requests erst nach dem zugehörigen Unterrichtsschritt senden. Für einen Ordnerlauf den vollständigen Stand verwenden und neu starten. Der erfolgreiche POST am Ende speichert created_course_id für den anschließenden GET.",
+      "item": [
+        {
+          "name": "Health prüfen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Erwarteter Status: 200. status ist ok."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alle Kurse lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Ohne q: nach Neustart fünf Kurse."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alte Runen lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/3",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "3"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Einzelobjekt."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"id\": 3, \"title\": \"Alte Runen\"}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ID null ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "0"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ungültige Eingaben: 422 vor der Funktion; gültige, nicht vorhandene ID: 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"path\", \"course_id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative ID ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/-1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "-1"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ungültige Eingaben: 422 vor der Funktion; gültige, nicht vorhandene ID: 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"path\", \"course_id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Text-ID ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/Harry",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "Harry"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ungültige Eingaben: 422 vor der Funktion; gültige, nicht vorhandene ID: 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"path\", \"course_id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlenden Kurs lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Ungültige Eingaben: 422 vor der Funktion; gültige, nicht vorhandene ID: 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Runen suchen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=RUN",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "RUN"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Suche ignoriert Groß-/Kleinschreibung."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal([{\"id\": 3, \"title\": \"Alte Runen\"}]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ohne Treffer suchen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=xyz",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "xyz"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Gültige Suche, leere Liste."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal([]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leeres q ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ein gesendetes q muss 2–100 Zeichen enthalten. q= ist nicht dasselbe wie ein weggelassener Parameter."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"query\", \"q\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kurzes q ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=A",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "A"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ein gesendetes q muss 2–100 Zeichen enthalten. q= ist nicht dasselbe wie ein weggelassener Parameter."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"query\", \"q\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Langes q ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses?q=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ein gesendetes q muss 2–100 Zeichen enthalten. q= ist nicht dasselbe wie ein weggelassener Parameter."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"query\", \"q\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kurse zählen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/count",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "count"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Feste Route vor /{course_id}; nach Neustart count=5."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"count\": 5}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlenden Titel ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"title\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leeren Titel ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"title\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leerzeichen ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"title\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Null-Titel ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"title\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zahl als Titel ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": 123\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"title\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Langen Titel ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"title\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eigene ID ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Flugkunde\",\n  \"id\": 42\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capacity ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Der Bestand bleibt unverändert; Fehlerort body/capacity.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Flugkunde\",\n  \"capacity\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"capacity\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Startproblem jetzt ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Im fertigen Stand werden sowohl Leerzeichen-Titel als auch das zusätzliche Feld abgelehnt.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"   \",\n  \"id\": 42\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Flugkunde anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses"
+              ]
+            },
+            "description": "Erwarteter Status: 201. title wird zu Flugkunde getrimmt. Öffentlich nur id und title; ID wird in created_course_id gespeichert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"  Flugkunde  \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"created_course_id\", pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Angelegten Kurs lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses/{{created_course_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courses",
+                "{{created_course_id}}"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Zuerst Flugkunde anlegen im selben Ordner ausführen. Nach Serverneustart erneut anlegen; gespeicherte Variablen können veraltet sein."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Schüler – Pflicht",
+      "description": "python -m uvicorn tag6.practice:app --reload --host 127.0.0.1 --port 8001. Requests passend zur bereits gelösten Aufgabe wählen. Ein kompletter Ordnerlauf setzt Aufgaben 1–7 und einen frischen Bestand voraus. Ungültige POSTs stehen vor der gültigen Anlage. Der letzte Summary-Request erwartet genau einen erfolgreichen POST.",
+      "item": [
+        {
+          "name": "Health prüfen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/health",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 2."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"status\": \"ok\", \"school\": \"Hogwarts\"}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alle Schüler lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 4: sechs Schüler, sortiert nach ID 11–16."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Luna lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/14",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 4: vollständiges öffentliches Schülerobjekt."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"id\": 14, \"first_name\": \"Luna\", \"last_name\": \"Lovegood\", \"house\": \"Ravenclaw\", \"school_year\": 2}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ID null ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/0",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "0"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 4: Typ-/Wertefehler von fehlendem Datensatz unterscheiden."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"path\", \"student_id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Text-ID ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/Luna",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "Luna"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 4: Typ-/Wertefehler von fehlendem Datensatz unterscheiden."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"path\", \"student_id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlenden Schüler lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/999",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Aufgabe 4: Typ-/Wertefehler von fehlendem Datensatz unterscheiden."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gryffindor filtern",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Gryffindor",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Gryffindor"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 5: IDs 11, 12, 15, 16."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Schuljahr 2 filtern",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?school_year=2",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "school_year",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 5: IDs 14 und 15."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Haus und Schuljahr kombinieren",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Gryffindor&school_year=2",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Gryffindor"
+                },
+                {
+                  "key": "school_year",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 5: beide Bedingungen müssen gelten; ausschließlich Ginny, ID 15."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hufflepuff ohne Treffer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Hufflepuff",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Hufflepuff"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 5: gültiger Hauswert ohne Treffer."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal([]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kleingeschriebenes Haus ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=gryffindor",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "gryffindor"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 5: ungültiger Filter statt leerer Ergebnisliste."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"query\", \"house\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unbekanntes Haus ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?house=Durmstrang",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "house",
+                  "value": "Durmstrang"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 5: ungültiger Filter statt leerer Ergebnisliste."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"query\", \"house\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Schuljahr 8 ablehnen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students?school_year=8",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "school_year",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 5: ungültiger Filter statt leerer Ergebnisliste."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"query\", \"school_year\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zusammenfassung vor Anlage",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/summary",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "summary"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 7: erst mit fertiger Summary-Route ausführen; vor dem POST und nach frischem Start."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"total\": 6, \"by_house\": {\"Gryffindor\": 4, \"Hufflepuff\": 0, \"Ravenclaw\": 1, \"Slytherin\": 1}}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leeren Vornamen ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/first_name.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"   \",\n  \"last_name\": \"Chang\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"first_name\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Null-Nachnamen ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/last_name.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": null,\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"last_name\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Langen Nachnamen ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/last_name.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"last_name\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unbekanntes Haus im Body ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/house.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \"Durmstrang\",\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"house\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Haus mit Leerzeichen ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/house.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \" Ravenclaw \",\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"house\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Null-Haus ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/house.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": null,\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"house\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ungültiges Schuljahr ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/school_year.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"school_year\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eigene Schüler-ID ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Aufgabe 6: kein neuer Datensatz; Fehlerort body/id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": 4,\n  \"id\": 42\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"id\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlendes Haus ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 422. house ist erforderlich, auch wenn Tag 5 das Feld noch weglassen ließ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Cho\",\n  \"last_name\": \"Chang\",\n  \"school_year\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Fehlerort\", function () { pm.expect(pm.response.json().detail[0].loc).to.deep.equal([\"body\", \"house\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cho anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Erwarteter Status: 201. Aufgabe 6: Namen trimmen, Text \"4\" als int übernehmen. Nur id, first_name, last_name, house, school_year ausgeben. Speichert created_student_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \" Cho \",\n  \"last_name\": \" Chang \",\n  \"house\": \"Ravenclaw\",\n  \"school_year\": \"4\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"created_student_id\", pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Angelegte Schülerin lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/{{created_student_id}}",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "{{created_student_id}}"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Zuerst Cho anlegen im selben Ordner ausführen. Alle Felder mit der POST-Antwort vergleichen."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zusammenfassung nach Anlage",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{practice_url}}/students/summary",
+              "host": [
+                "{{practice_url}}"
+              ],
+              "path": [
+                "students",
+                "summary"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Aufgabe 7: nach genau einem erfolgreichen POST ab frischem Start. Insgesamt sieben Schüler, Ravenclaw zwei."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"total\": 7, \"by_house\": {\"Gryffindor\": 4, \"Hufflepuff\": 0, \"Ravenclaw\": 2, \"Slytherin\": 1}}); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Kursbonus",
+      "description": "Nur mit tag6.bonus:app auf Port 8002. Vor dem Wechsel zum Schülerbonus diesen Server mit Strg+C stoppen. Der Bonus hat seinen eigenen Speicherprozess und übernimmt keine POSTs des Pflichtservers. Kein Health-Endpunkt in dieser Bonus-App.",
+      "item": [
+        {
+          "name": "Kurs vor PATCH lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/1",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Frischer Bonusbestand: Arithmantik."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kurstitel trimmen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/1",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nur title senden. Das Beispiel zeigt Trimmen; die automatisierten Bonustests prüfen zusätzlich eine tatsächliche Speicheränderung.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \" Arithmantik \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"id\": 1, \"title\": \"Arithmantik\"}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kurs nach PATCH lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/1",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Mit PATCH-Antwort vergleichen."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Antwortinhalt\", function () { pm.expect(pm.response.json()).to.deep.equal({\"id\": 1, \"title\": \"Arithmantik\"}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leeren PATCH ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/1",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 400. Ein leerer Änderungsauftrag ergibt 400; ein ungültiger Feldwert 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Null-Titel im PATCH ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/1",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ein leerer Änderungsauftrag ergibt 400; ein ungültiger Feldwert 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leerzeichen im PATCH ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/1",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "1"
+              ]
+            },
+            "description": "Erwarteter Status: 422. Ein leerer Änderungsauftrag ergibt 400; ein ungültiger Feldwert 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlenden Kurs ändern",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/courses/999",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "courses",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Gültiger Body, aber Kurs fehlt.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Arithmantik\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buchungsvorschau lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/bookings/101",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "bookings",
+                "101"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Verschachtelte Objekte student und course; interne Notiz fehlt auch im Schülerobjekt."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Schülerbonus",
+      "description": "Nur mit tag6.practice_bonus:app auf Port 8002. Zuvor einen eventuell laufenden Kursbonus auf Port 8002 mit Strg+C stoppen. Eigener Speicherprozess; kein Health-Endpunkt in dieser Bonus-App.",
+      "item": [
+        {
+          "name": "Luna vor PATCH lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Unveränderten Nachnamen, Haus und Schuljahr zum Vergleich notieren."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vornamen trimmen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Nur first_name senden. Nicht gesendete Felder bleiben erhalten. Der automatisierte Test prüft zusätzlich eine tatsächliche Änderung eines alten Speicherwerts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \" Luna \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Luna nach PATCH lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Mit PATCH-Antwort vergleichen."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leeren PATCH ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 400. 400: kein Änderungsauftrag; 422: ungültiger oder nicht erlaubter Feldwert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Null-Namen ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 422. 400: kein Änderungsauftrag; 422: ungültiger oder nicht erlaubter Feldwert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leerzeichen im Namen ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 422. 400: kein Änderungsauftrag; 422: ungültiger oder nicht erlaubter Feldwert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Schuljahr im PATCH ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/14",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "14"
+              ]
+            },
+            "description": "Erwarteter Status: 422. 400: kein Änderungsauftrag; 422: ungültiger oder nicht erlaubter Feldwert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"school_year\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fehlenden Schüler ändern",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/students/999",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "students",
+                "999"
+              ]
+            },
+            "description": "Erwarteter Status: 404. Gültiger Body, aber Schüler fehlt.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Luna\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buchungsvorschauen lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bonus_url}}/bookings",
+              "host": [
+                "{{bonus_url}}"
+              ],
+              "path": [
+                "bookings"
+              ]
+            },
+            "description": "Erwarteter Status: 200. Vorschauen 101 und 102 mit verschachtelten Schüler- und Kursobjekten; interne Notizen fehlen."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
