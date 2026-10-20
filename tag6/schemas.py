@@ -19,3 +19,6 @@ class CourseRead(BaseModel):
     # Ausgabeschema bzw. Antwortschema
     id: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=100)
+
+class CourseCount(BaseModel):
+    count: int = Field(ge=0)
