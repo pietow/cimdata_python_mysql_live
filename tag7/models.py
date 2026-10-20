@@ -35,6 +35,7 @@ class Course(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(100))
+    room: Mapped[str | None] = mapped_column(String(30))
     bookings: Mapped[list["Booking"]] = relationship(
         back_populates="course"
     )
