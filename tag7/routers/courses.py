@@ -9,6 +9,7 @@ from tag7.dependencies import DbSession
 from tag7.models import Course
 from tag7.schemas import CourseCreate, CourseRead, CourseCount
 
+
 router = APIRouter(prefix="/courses", tags=["Kurse"])
 CourseId = Annotated[int, Path(ge=1)]
 Search = Annotated[str | None, Query(min_length=2, max_length=100, description="Teil des Titles")]
@@ -39,8 +40,28 @@ def create_course(data: CourseCreate, session: DbSession): # Bei Fehler in Cours
         course = Course(title=data.title) #ORM Instanz
         session.add(course)
         session.flush()
-    return course
+        result = CourseRead.model_validate(course)
+    return result
 
-    courses[course_id] = created
-    print('COURSES: ', courses)
-    return created
+@router.put("/{course_id}", response_model=CourseRead)
+def replace_course(course_id: CourseId, data: CourseCreate, session: DbSession):
+    with session.begin():  # autocommit
+        course = session.get(Course, course_id)   # ORM-Objekt via SQLAlchemy
+        if course is None:
+            raise HTTPException(404, "Kurs nicht gefunden")
+        course.title = data.title
+        session.flush()
+        result = CourseRead.model_validate(course)
+    return result
+
+
+@router.delete("/{course_id}", status_code=204)
+def delete_course(course_id: CourseId, session: DbSession):
+    try:
+        with session.begin():  # autocommit
+            if session.get(Course, course_id) is None:   
+                raise HTTPException(404, "Kurs nicht gefunden")
+            session.execute(delete(Course).where(Course.id == course_id))
+    except IntegrityError as exc:
+        raise HTTPException(409, "Kurs wird noch verwendet.")
+    return Response(status_code=204)
