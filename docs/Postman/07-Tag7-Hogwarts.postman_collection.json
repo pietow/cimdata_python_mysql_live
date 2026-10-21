@@ -1,0 +1,1385 @@
+{
+  "info": {
+    "name": "Tag 7 – Hogwarts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Begleitmaterial zu Tag 7. Importieren und an die Teilnehmenden weitergeben.\nOrdner passend zum Unterrichtsstand einzeln und der Reihenfolge nach verwenden.\nNicht die ganze Collection in einem Lauf starten: Migration und Übungsimplementierung liegen dazwischen.\n00: Kursrouter, Port 8000. 01: zusätzlicher Buchungsrouter, Port 8000.\n02: Erst nach Migration 0002 und Neustart. 03: eigene Übungs-App, Port 8001.\n04: nur nach Bonusimplementierung, Port 8002.\nAlle Apps verwenden dieselbe MySQL-Datenbank. Ein Neustart setzt sie nicht zurück.\nVorher die tatsächlichen IDs von Harry Potter und Ron Weasley per SQL bestimmen und als harry_id/ron_id setzen.\nPositive, nachweislich nicht vorhandene IDs als missing_student_id und missing_course_id setzen.\nKeine IDs aus Tag 6 übernehmen. IDs sind Zahlen; die JSON-Platzhalter bleiben ohne Anführungszeichen.\nWeitere IDs werden aus erfolgreichen Antworten übernommen. Collection-Variablen verwenden; gleichnamige Environment-Variablen vermeiden.\nPOST-Anlage und erfolgreiche Gruppenbuchung jeweils nur einmal senden. Wiederholungen erzeugen zusätzliche Einträge.\nprobe_course_id ist der löschbare Vormittagskurs. created_course_id bleibt für die Übungen erhalten.\nBei bereits erledigtem Vormittag die tatsächlichen Live-IDs übernehmen und direkt mit dem passenden Ordner fortfahren.\nFür Rollback-Vergleiche zwischen Vorher/Nachher keine parallelen Buchungen durchführen.\nDie Antwortprüfungen sind vorgegeben. Eigene Testskripte sind heute keine Pflicht.\nNach Serverneustart einzelne GET-Prüfungen wiederholen; nicht dafür die POSTs erneut senden.\n"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "practice_url",
+      "value": "http://127.0.0.1:8001",
+      "type": "string"
+    },
+    {
+      "key": "bonus_url",
+      "value": "http://127.0.0.1:8002",
+      "type": "string"
+    },
+    {
+      "key": "harry_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ron_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "missing_student_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "missing_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "runen_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "probe_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "created_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booked_course_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_one_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_two_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "luna_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "before_bookings",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "before_move",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Kurse lesen und ändern",
+      "item": [
+        {
+          "name": "01 Erreichbarkeit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status ok\", () => pm.expect(pm.response.json().status).to.eql(\"ok\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Kurskatalog und Runen-ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Alte Runen eindeutig vorhanden\", () => {",
+                  " const rows = pm.response.json().filter(r => r.title === \"Alte Runen\");",
+                  " pm.expect(rows.length).to.eql(1);",
+                  " pm.collectionVariables.set(\"runen_course_id\", rows[0].id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Kursanzahl",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/count",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Runen suchen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses?q=Runen",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Ungültige Kurs-ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/0",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Probekurs anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses",
+            "description": "Nur einmal senden. Die Antwort setzt probe_course_id für die folgenden Aufrufe.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \" Flugkunde \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"probe_course_id\", pm.response.json().id);",
+                  "pm.test(\"Titel\", () => pm.expect(pm.response.json().title).to.eql(\"Flugkunde\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Probekurs lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "Nach Serverneustart nochmals senden: derselbe Kurs bleibt erhalten."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Titel\", () => pm.expect(pm.response.json().title).to.eql(\"Flugkunde\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Probekurs umbenennen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Flugtraining\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Titel\", () => pm.expect(pm.response.json().title).to.eql(\"Flugtraining\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Leeren Titel ablehnen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \" \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Probekurs löschen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));",
+                  "",
+                  "pm.test(\"Leerer Body\", () => pm.expect(pm.response.text()).to.eql(\"\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Gelöschten Kurs lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Löschung wiederholen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Gruppenbuchung und Rollback",
+      "item": [
+        {
+          "name": "01 Flugkunde für Übungen anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses",
+            "description": "Genau einmal anlegen. Diesen Kurs und seine Buchungen für den Nachmittag behalten.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Flugkunde\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"created_course_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Buchungen vorher sichern",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"before_bookings\", JSON.stringify(pm.response.json()));",
+                  "if (pm.response.code === 200 && pm.response.json().length) pm.collectionVariables.set(\"booked_course_id\", pm.response.json()[0].course_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Gebuchten Kurs nicht löschen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/courses/{{booked_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Fremdschlüssel schützt Kurs\", () => pm.expect(pm.response.json().detail).to.eql(\"Kurs wird noch verwendet.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Gruppenauftrag mit fehlendem Schüler",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/booking-batches",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": {{created_course_id}},\n  \"student_ids\": [\n    {{harry_id}},\n    {{missing_student_id}}\n  ],\n  \"booking_date\": \"1993-09-06\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Fehlender Schüler\", () => pm.expect(pm.response.json().detail).to.eql(\"Schüler nicht gefunden.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Rollback durch Vergleich prüfen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Buchungen unverändert\", () => pm.expect(pm.response.json()).to.deep.equal(JSON.parse(pm.collectionVariables.get(\"before_bookings\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Harry und Ron gemeinsam buchen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/booking-batches",
+            "description": "Genau einmal senden. Weitere POSTs erzeugen weitere Buchungen; es gibt keine Dublettenregel.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": {{created_course_id}},\n  \"student_ids\": [\n    {{harry_id}},\n    {{ron_id}}\n  ],\n  \"booking_date\": \"1993-09-06\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Zwei passende Buchungen\", () => {",
+                  " const rows = pm.response.json();",
+                  " pm.expect(rows.length).to.eql(2);",
+                  " pm.expect(rows.map(r => r.student_id)).to.deep.equal([",
+                  "  Number(pm.collectionVariables.get(\"harry_id\")), Number(pm.collectionVariables.get(\"ron_id\"))]);",
+                  " rows.forEach(r => {",
+                  "  pm.expect(r.course_id).to.eql(Number(pm.collectionVariables.get(\"created_course_id\")));",
+                  "  pm.expect(r.booking_date).to.eql(\"1993-09-06\");",
+                  " });",
+                  " pm.expect(rows[0].id).not.to.eql(rows[1].id);",
+                  " pm.collectionVariables.set(\"booking_one_id\", rows[0].id);",
+                  " pm.collectionVariables.set(\"booking_two_id\", rows[1].id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Gespeicherte Buchungen lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Beide neuen IDs gespeichert\", () => {",
+                  " const ids = pm.response.json().map(r => r.id);",
+                  " pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"booking_one_id\")));",
+                  " pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"booking_two_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Nach der Migration",
+      "item": [
+        {
+          "name": "01 Raumspalte in Kursantwort",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/{{created_course_id}}",
+            "description": "Erst nach Alembic upgrade head, CourseRead-Ergänzung und Serverneustart senden. Eine HTTP-Antwort ersetzt nicht die SQL- und Alembic-Prüfungen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Neues Feld zunächst null\", () => pm.expect(pm.response.json()).to.have.property(\"room\", null));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Übungen",
+      "item": [
+        {
+          "name": "01 Schüler lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Luna eindeutig vorhanden\", () => {",
+                  " const rows = pm.response.json().filter(r => r.first_name === \"Luna\" && r.last_name === \"Lovegood\");",
+                  " pm.expect(rows.length).to.eql(1);",
+                  " pm.collectionVariables.set(\"luna_id\", rows[0].id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Einzelne Schülerin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students/{{luna_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Haus filtern",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students?house=Gryffindor",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Schuljahr filtern",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students?school_year=2",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Beide Filter verbinden",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students?house=Gryffindor&school_year=2",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Beide Bedingungen gelten\", () => pm.response.json().forEach(r => { pm.expect(r.house).to.eql(\"Gryffindor\"); pm.expect(r.school_year).to.eql(2); }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Ungültiges Haus",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students?house=gryffindor",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Ungültiges Schuljahr",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students?school_year=8",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Fehlender Schüler",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/students/{{missing_student_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Harrys Buchung vorher sichern",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Zusatzbuchung vorhanden\", () => {",
+                  " const row = pm.response.json().find(r => r.id === Number(pm.collectionVariables.get(\"booking_one_id\")));",
+                  " pm.expect(row).to.be.an(\"object\");",
+                  " pm.collectionVariables.set(\"before_move\", JSON.stringify(row));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Harry zu Alten Runen umbuchen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{practice_url}}/bookings/{{booking_one_id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": {{runen_course_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nur Kurs geändert\", () => {",
+                  " const expected = JSON.parse(pm.collectionVariables.get(\"before_move\"));",
+                  " expected.course_id = Number(pm.collectionVariables.get(\"runen_course_id\"));",
+                  " pm.expect(pm.response.json()).to.deep.equal(expected);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Fehlenden Zielkurs ablehnen",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{practice_url}}/bookings/{{booking_one_id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": {{missing_course_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Umbuchung gespeichert",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Harry bleibt in Alten Runen\", () => {",
+                  " const row = pm.response.json().find(r => r.id === Number(pm.collectionVariables.get(\"booking_one_id\")));",
+                  " pm.expect(row.course_id).to.eql(Number(pm.collectionVariables.get(\"runen_course_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 Rons Zusatzbuchung löschen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{practice_url}}/bookings/{{booking_two_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));",
+                  "",
+                  "pm.test(\"Leerer Body\", () => pm.expect(pm.response.text()).to.eql(\"\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Löschung wiederholen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{practice_url}}/bookings/{{booking_two_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 Löschung kontrollieren",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nur Rons Zusatzbuchung entfernt\", () => {",
+                  " const ids = pm.response.json().map(r => r.id);",
+                  " pm.expect(ids).not.to.include(Number(pm.collectionVariables.get(\"booking_two_id\")));",
+                  " pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"booking_one_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 Bestand vor Fehlerauftrag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"before_bookings\", JSON.stringify(pm.response.json()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 Atomaren Fehlerauftrag senden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{practice_url}}/booking-batches",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": {{created_course_id}},\n  \"student_ids\": [\n    {{harry_id}},\n    {{missing_student_id}}\n  ],\n  \"booking_date\": \"1993-09-06\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Fehlender Schüler\", () => pm.expect(pm.response.json().detail).to.eql(\"Schüler nicht gefunden.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 Bestand nach Fehlerauftrag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Buchungen unverändert\", () => pm.expect(pm.response.json()).to.deep.equal(JSON.parse(pm.collectionVariables.get(\"before_bookings\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 Kurs und Raumfeld prüfen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{practice_url}}/courses/{{created_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Raumfeld vorhanden\", () => pm.expect(pm.response.json()).to.have.property(\"room\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Bonus",
+      "item": [
+        {
+          "name": "01 Alle Buchungen im Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bonus_url}}/booking-report",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Ein Buchungstag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bonus_url}}/booking-report?start=1993-09-06&end=1993-09-06",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Grenzen inklusive\", () => pm.response.json().forEach(r => pm.expect(r.booking_date).to.eql(\"1993-09-06\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Vertauschte Datumsgrenzen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bonus_url}}/booking-report?start=1993-09-07&end=1993-09-06",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Ungültiges Datum",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bonus_url}}/booking-report?start=kein-datum",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Raum setzen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bonus_url}}/courses/{{created_course_id}}/room",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room\": \" Nordturm \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Raum getrimmt\", () => pm.expect(pm.response.json().room).to.eql(\"Nordturm\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Raum gespeichert",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bonus_url}}/courses/{{created_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Raum gespeichert\", () => pm.expect(pm.response.json().room).to.eql(\"Nordturm\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Fehlendes Raumfeld",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bonus_url}}/courses/{{created_course_id}}/room",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Leeren Raum ablehnen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bonus_url}}/courses/{{created_course_id}}/room",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room\": \" \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Fehlenden Kurs ablehnen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bonus_url}}/courses/{{missing_course_id}}/room",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room\": \"Nordturm\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Raum entfernen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bonus_url}}/courses/{{created_course_id}}/room",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Raum entfernt\", () => pm.expect(pm.response.json().room).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Entfernung gespeichert",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bonus_url}}/courses/{{created_course_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Raum bleibt null\", () => pm.expect(pm.response.json().room).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
