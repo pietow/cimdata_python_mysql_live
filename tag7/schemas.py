@@ -14,6 +14,7 @@ class CourseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=100)
+    room: str | None = None
 
 class CourseCount(BaseModel):
     count: int = Field(ge=0)
