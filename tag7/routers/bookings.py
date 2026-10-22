@@ -14,7 +14,7 @@ def read_bookings(db: DbSession):
     return db.scalars(select(Booking).order_by(Booking.id)).all()
 
 
-@router.post("/booking-batches", response_model=list[BookingRead])
+@router.post("/booking-batches", response_model=list[BookingRead], status_code=201)
 def create_booking_batch(data: BookingBatchCreate, db: DbSession):
     try:
         with db.begin():
