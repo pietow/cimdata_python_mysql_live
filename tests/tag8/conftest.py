@@ -8,6 +8,10 @@ from tag7.dependencies import get_session
 from tag8.testing_db import make_test_url
 from tag8.main import  app
 
+@pytest.fixture
+def client():
+    return TestClient(app)
+
 @pytest.fixture(scope="session")# session ist hier nicht MYSQL SESSION, sondern test session
 def test_engine():  
     engine = create_engine(make_test_url(), pool_pre_ping=True)
