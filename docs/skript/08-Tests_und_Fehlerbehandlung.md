@@ -3,7 +3,7 @@
 Tag 8 des Kurses „Programmierung mit Python für komplexe Datenbanken“.
 
 Die Hogwarts-Verwaltung möchte Änderungen an der Buchungs-API sicher prüfen.
-Du baust auf [Tag 7][tag7] auf und testest Antworten sowie gespeicherte Daten.
+Du baust auf Tag 7 auf und testest Antworten sowie gespeicherte Daten.
 
 - Neue Wahlfachbuchungen sind erst ab dem dritten Schuljahr erlaubt.
 - Harry darf buchen. Luna und Ginny in Jahr 2 werden abgelehnt.
