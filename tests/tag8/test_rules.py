@@ -4,6 +4,7 @@ from tag8.rules import SchoolYearTooLow, validate_elective_year
 
 @pytest.mark.parametrize("year", [3, 7])
 def test_elective_accepts_allowed_year(year):
+   
     validate_elective_year(year, "Alte Runen")
 
 
