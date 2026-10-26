@@ -28,5 +28,5 @@ def school_year_error(request: Request, exc: SchoolYearTooLow):
 
 @app.exception_handler(OperationalError)
 def database_error(request: Request, exc: OperationalError):
-    logger.error(f"db_unavailable method={request.method} path={request.url.path}")
-    return JSONResponse(status_code=503, content={"detail": "Datenbank derzeit nicht erreichbar"})
+    logger.error(f"database_unavailable method={request.method} path={request.url.path}")
+    return JSONResponse(status_code=503, content={"detail": "Datenbank derzeit nicht erreichbar."})
