@@ -1,22 +1,22 @@
 import logging
 
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
 from tag8.logging_setup import configure_logging
-from tag8.routers import bookings
 from tag8.rules import SchoolYearTooLow
 
-from tag9.routers import auth, courses
+from tag9.dependencies import require_staff
+from tag9.routers import auth, bookings,courses
 
 configure_logging()
 logger = logging.getLogger("hogwarts.api")
 app = FastAPI(title="Hogwarts-Kursverwaltung", description="Lern-API mit MySQL", version="0.5.0")
 app.include_router(auth.router)
 app.include_router(courses.router)
-app.include_router(bookings.router)
+app.include_router(bookings.router, dependencies=[Depends(require_staff)])
 
 @app.get("/health")
 def read_health():
