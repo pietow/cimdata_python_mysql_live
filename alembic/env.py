@@ -1,7 +1,7 @@
 from alembic import context
 
 from tag7.db import engine
-from tag7.models import Base
+from tag9.models import Base
 
 # Alle drei ORM-Klassen wurden durch den Modulimport registriert.
 target_metadata = Base.metadata

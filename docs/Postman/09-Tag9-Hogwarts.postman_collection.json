@@ -1,0 +1,1264 @@
+{
+  "info": {
+    "name": "Tag 9 – Hogwarts: API-Sicherheit",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Zum Dozentenskript Tag 9. Nur die Tag-9-App auf Port 8000 starten. Ordner 00–04 nacheinander ausführen. Lokale Konten babbling (reader) und vector (staff) vorher per create_user anlegen. Passwörter nur lokal eintragen; keine befüllten Exporte teilen. Der Ablauf erzeugt und löscht einen eigenen Probekurs. Bei Abbruch dessen probe_course_id zum Aufräumen verwenden. Kein Request verändert bestehende Buchungen. Token werden automatisch lokal gespeichert. Nach Abschluss Passwörter und Token leeren. Keine gleichnamigen Environment-Variablen verwenden. Ordner 05 gehört nur zur selbst implementierten Nachmittagsaufgabe. Vor Ordner 05 Reader und Staff erneut anmelden; danach beide wieder abmelden. Login-Bodies werden mit JSON.stringify erstellt, damit Sonderzeichen unverändert übertragen werden. Tag 9 verwendet eine gemeinsame Datenbank-Session pro Request für Identitätsprüfung und Fachroute. Schreibende Routen committen bei Erfolg; bei Fehlern wird die Request-Transaktion zurückgerollt. Nach Übernahme des aktualisierten Codes die API neu starten. Eine neue Migration oder erneute Kontoanlage ist dafür nicht nötig."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "reader_username",
+      "value": "babbling",
+      "type": "string"
+    },
+    {
+      "key": "staff_username",
+      "value": "vector",
+      "type": "string"
+    },
+    {
+      "key": "reader_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staff_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reader_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staff_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "probe_course_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 – Ohne Anmeldung",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Health', function () {",
+                  "  pm.expect(pm.response.json()).to.eql({status: 'ok'});",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kurse ohne Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Bearer-Challenge', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate'))",
+                  "    .to.eql('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erfundenes Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/auth/me",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "ungueltiges-token",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Bearer-Challenge', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate'))",
+                  "    .to.eql('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 – Anmeldung und Identität",
+      "item": [
+        {
+          "name": "Falsches Passwort",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{tag9_login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ein JavaScript-Objekt wird korrekt als JSON serialisiert.",
+                  "// Auch Anführungszeichen und Backslashes im Passwort bleiben erhalten.",
+                  "const body = {",
+                  "  username: pm.variables.get('reader_username'),",
+                  "  password: \"Absichtlich-falsch-fuer-Test-123!\"",
+                  "};",
+                  "pm.variables.set('tag9_login_body', JSON.stringify(body));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Bearer-Challenge', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate'))",
+                  "    .to.eql('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reader anmelden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{tag9_login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ein JavaScript-Objekt wird korrekt als JSON serialisiert.",
+                  "// Auch Anführungszeichen und Backslashes im Passwort bleiben erhalten.",
+                  "const body = {",
+                  "  username: pm.variables.get('reader_username'),",
+                  "  password: pm.variables.get('reader_password')",
+                  "};",
+                  "pm.collectionVariables.unset('reader_token'); // Kein altes Token weiterverwenden.",
+                  "pm.variables.set('tag9_login_body', JSON.stringify(body));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Tokenvertrag', function () {",
+                  "    pm.expect(body.token_type).to.eql('bearer');",
+                  "    pm.expect(body.expires_in).to.eql(1800);",
+                  "    pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "    pm.expect(pm.response.headers.get('Cache-Control'))",
+                  "      .to.eql('no-store');",
+                  "  });",
+                  "  pm.collectionVariables.set('reader_token', body.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eigenes Konto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/auth/me",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Öffentliche Identität', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.all.keys('id', 'username', 'role');",
+                  "  pm.expect(body.role).to.eql('reader');",
+                  "  pm.expect(body.username).to.eql(",
+                  "    pm.collectionVariables.get('reader_username'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rolle kann nicht im Login gewählt werden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{tag9_login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ein JavaScript-Objekt wird korrekt als JSON serialisiert.",
+                  "// Auch Anführungszeichen und Backslashes im Passwort bleiben erhalten.",
+                  "const body = {",
+                  "  username: pm.variables.get('reader_username'),",
+                  "  password: pm.variables.get('reader_password')",
+                  "};",
+                  "body.role = 'staff'; // Absichtlicher Validierungsfehler.",
+                  "pm.variables.set('tag9_login_body', JSON.stringify(body));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test('Keine rohen Eingaben in Fehlern', function () {",
+                  "  pm.response.json().detail.forEach(function (error) {",
+                  "    pm.expect(error).not.to.have.property('input');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 – Leserecht prüfen",
+      "item": [
+        {
+          "name": "Kurse lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kurse zählen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/count",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alte Runen suchen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses?q=Runen",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kursanlage als Reader verboten",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Tag 9 – nicht anlegen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buchungen als Reader verboten",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gruppenbuchung als Reader verboten",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/booking-batches",
+            "description": "Die positiven Beispiel-IDs werden nicht verwendet: Die Rechteprüfung muss den Auftrag vor dem DB-Zugriff mit 403 beenden. Für erfolgreiche Buchungen echte IDs verwenden; das geschieht in den isolierten pytest-Tests.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": 1,\n  \"student_ids\": [\n    1\n  ],\n  \"booking_date\": \"1993-09-06\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 – Verwaltungsrecht prüfen",
+      "item": [
+        {
+          "name": "Staff anmelden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{tag9_login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ein JavaScript-Objekt wird korrekt als JSON serialisiert.",
+                  "// Auch Anführungszeichen und Backslashes im Passwort bleiben erhalten.",
+                  "const body = {",
+                  "  username: pm.variables.get('staff_username'),",
+                  "  password: pm.variables.get('staff_password')",
+                  "};",
+                  "pm.collectionVariables.unset('staff_token'); // Kein altes Token weiterverwenden.",
+                  "pm.variables.set('tag9_login_body', JSON.stringify(body));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Tokenvertrag', function () {",
+                  "    pm.expect(body.token_type).to.eql('bearer');",
+                  "    pm.expect(body.expires_in).to.eql(1800);",
+                  "    pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "    pm.expect(pm.response.headers.get('Cache-Control'))",
+                  "      .to.eql('no-store');",
+                  "  });",
+                  "  pm.collectionVariables.set('staff_token', body.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buchungen als Staff lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eigenen Probekurs anlegen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Tag 9 – Muggelkunde\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('probe_course_id',",
+                  "    pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Probekurs als Reader lesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Änderung als Reader verboten",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Nicht übernehmen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Löschung als Reader verboten",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Probekurs als Staff ändern",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Tag 9 – Muggelkunde am Abend\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Geänderter Titel', function () {",
+                  "  pm.expect(pm.response.json().title)",
+                  "    .to.eql('Postman Tag 9 – Muggelkunde am Abend');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Änderung nachlesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Änderung ist gespeichert', function () {",
+                  "  pm.expect(pm.response.json().title)",
+                  "    .to.eql('Postman Tag 9 – Muggelkunde am Abend');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eigenen Probekurs löschen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Löschung nachlesen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses/{{probe_course_id}}",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 – Anmeldungen widerrufen",
+      "item": [
+        {
+          "name": "Reader abmelden",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/auth/logout",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Widerrufenes Reader-Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/auth/me",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Bearer-Challenge', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate'))",
+                  "    .to.eql('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Staff abmelden",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/auth/logout",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Widerrufenes Staff-Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/courses",
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Bearer-Challenge', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate'))",
+                  "    .to.eql('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 – Übung: Verwaltungsübersicht",
+      "description": "Erst nach Aufgabe 4 ausführen. Zuvor Reader anmelden und Staff anmelden erneut senden; danach beide wieder abmelden. Keine festen Live-Zählerstände voraussetzen.",
+      "item": [
+        {
+          "name": "Verwaltungsübersicht ohne Anmeldung",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Bearer-Challenge', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate')).to.eql('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/admin/summary"
+          },
+          "response": []
+        },
+        {
+          "name": "Verwaltungsübersicht als Reader",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reader_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/admin/summary"
+          },
+          "response": []
+        },
+        {
+          "name": "Verwaltungsübersicht als Staff",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Verwaltungsübersicht', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.all.keys('requested_by', 'students', 'courses', 'bookings');",
+                  "  pm.expect(body.requested_by).to.eql(pm.variables.get('staff_username'));",
+                  "  ['students', 'courses', 'bookings'].forEach(function (field) {",
+                  "    pm.expect(body[field]).to.be.a('number');",
+                  "    pm.expect(Number.isInteger(body[field])).to.eql(true);",
+                  "    pm.expect(body[field]).to.be.at.least(0);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staff_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/admin/summary"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
