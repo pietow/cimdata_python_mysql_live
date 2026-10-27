@@ -7,6 +7,7 @@ from tag7.schemas import CourseCount, CourseCreate, CourseRead
 from tag9.dependencies import DbSession, get_current_user
 from tag9.routers.courses import CourseId, Search
 from tag10.models import CourseManager #Neu
+from tag10.pagination import AfterId, Limit  # Neu (OWASP: API4)
 from tag10.permissions import StaffUser, managed_course #Neu
 
 
@@ -19,11 +20,11 @@ router = APIRouter(
 
 
 @router.get("", response_model=list[CourseRead])
-def read_courses(session: DbSession, q:Search = None):
-    statement = select(Course).order_by(Course.id)
+def read_courses(session: DbSession, q:Search = None, limit: Limit = 20, after_id: AfterId = 0):  # Neue Parameter 
+    statement = select(Course).where(Course.id > after_id)
     if q is not None:
         statement = statement.where(Course.title.contains(q, autoescape=True))
-    return session.scalars(statement).all()
+    return session.scalars(statement.order_by(Course.id).limit(limit)).all() # Pagination: API4 (OWASP)
 
 @router.get("/count", response_model=CourseCount)
 def read_course_count(session: DbSession):

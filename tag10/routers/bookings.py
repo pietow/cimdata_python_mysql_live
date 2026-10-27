@@ -6,20 +6,23 @@ from tag7.schemas import BookingBatchCreate, BookingRead
 from tag9.dependencies import DbSession
 from tag9.routers.bookings import create_booking_batch as save_batch
 from tag10.models import CourseManager
+from tag10.pagination import AfterId, Limit
 from tag10.permissions import StaffUser, managed_course
 
 router = APIRouter(tags=["Buchungen"])
 
 
 @router.get("/bookings", response_model=list[BookingRead])
-def read_bookings(db: DbSession, user: StaffUser):
+def read_bookings(db: DbSession, user: StaffUser, limit: Limit = 20, after_id: AfterId = 0):
     statement = (
         select(Booking)
         # Zuständigkeit zum Kurs der Buchung hinzunehmen.
         .join(CourseManager, CourseManager.course_id == Booking.course_id)
         # API1: Nur Kurse des bestätigten Kontos auswählen.
         .where(CourseManager.user_id == user.id)
+        .where(Booking.id > after_id)  # Navigation: Wo geht es bei nächster Page/Seite weiter?
         .order_by(Booking.id)
+        .limit(limit)  # API4: Treffer begrenzen:verhindert unlimited "Number of records per page to return in a single request-response"
     )
     return db.scalars(statement).all()
 
