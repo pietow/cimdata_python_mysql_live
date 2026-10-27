@@ -31,7 +31,9 @@ services:
       MYSQL_DATABASE: hogwarts
       MYSQL_USER: hogwarts_app
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       ALLOWED_HOSTS: localhost,127.0.0.1
+      API_DOCS: "0"
       PORT: "8000"
     ports:
       - "127.0.0.1:8000:8000"

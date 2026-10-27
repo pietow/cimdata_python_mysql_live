@@ -8,7 +8,7 @@ WORKDIR /app
 # Zuerst Pakete installieren: Reine Codeänderungen können diese Schicht nutzen.
 # Auch die mit -r referenzierten Requirements-Dateien müssen vorhanden sein.
 COPY requirements*.txt ./
-RUN python -m pip install --no-cache-dir -r requirements-tag7.txt
+RUN python -m pip install --no-cache-dir -r requirements-tag9.txt
 
 # .dockerignore bestimmt, welche lokalen Dateien dabei ausgeschlossen sind.
 COPY . .

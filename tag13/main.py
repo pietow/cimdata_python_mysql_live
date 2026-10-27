@@ -1,22 +1,19 @@
 import os
 
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-
-from tag8.main import app
-
-app.version = "0.9.0"
-
-# Nur die bewusst freigegebenen Hostnamen annehmen.
-# Die Variable enthält Hostnamen ohne https:// und ohne Leerzeichen.
-allowed_hosts = os.environ.get(
-    "ALLOWED_HOSTS", "localhost,127.0.0.1"
-).split(",")
-app.add_middleware(
-    TrustedHostMiddleware, allowed_hosts=allowed_hosts
-)
+from tag10.main import create_app as create_previous_app
 
 
-@app.get("/version")
-def read_version():
-    # Zeigt, welcher Code tatsächlich im laufenden Dienst ankommt.
-    return {"version": app.version}
+def create_app(show_docs=False):
+    # Der bekannte Aufbau aus Tag 10 bleibt: Auth, Kurse, Buchungen, Rechte.
+    app = create_previous_app(show_docs=show_docs)
+    app.version = "0.9.0"
+
+    @app.get("/version")
+    def read_version():
+        # Zeigt, welcher Code tatsächlich im laufenden Dienst ankommt.
+        return {"version": app.version}
+
+    return app
+
+
+app = create_app(show_docs=os.environ.get("API_DOCS", "0") == "1")
