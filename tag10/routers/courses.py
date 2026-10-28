@@ -21,7 +21,7 @@ router = APIRouter(
 
 @router.get("", response_model=list[CourseRead])
 def read_courses(session: DbSession, q:Search = None, limit: Limit = 20, after_id: AfterId = 0):  # Neue Parameter 
-    statement = select(Course).where(Course.id > after_id)
+    statement = select(Course).where(Course.id > after_id) # Neu
     if q is not None:
         statement = statement.where(Course.title.contains(q, autoescape=True))
     return session.scalars(statement.order_by(Course.id).limit(limit)).all() # Pagination: API4 (OWASP)
