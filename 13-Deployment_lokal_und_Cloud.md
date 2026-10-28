@@ -207,15 +207,22 @@ flowchart TD
 ```python
     # Innerhalb von create_app; anstelle der bisherigen festen Hostliste.
     # API8: Nur die bewusst freigegebenen Hostnamen annehmen.
-    # Die Variable enthält Hostnamen ohne https:// und ohne Leerzeichen.
-    allowed_hosts = os.environ.get(
-        "ALLOWED_HOSTS", "localhost,127.0.0.1"
-    ).split(",")
+    # Die Variable enthält Hostnamen ohne https:// und ohne Port, kommagetrennt.
+    # strip() entfernt Leerzeichen; leere Einträge (z. B. "a,,b") fallen weg.
+    allowed_hosts = [
+        host.strip()
+        for host in os.environ.get(
+            "ALLOWED_HOSTS", "localhost,127.0.0.1"
+        ).split(",")
+        if host.strip()
+    ]
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=allowed_hosts
     )
 ```
 
+- Aus `"localhost, 127.0.0.1,20.79.155.100"` wird die Liste `["localhost", "127.0.0.1", "20.79.155.100"]`.
+- Ohne `strip()` stünde dort `" 127.0.0.1"` mit Leerzeichen – dieser Host würde nie passen.
 - **Die öffentliche IP bzw. der DNS-Name der VM muss erlaubt sein, sonst antwortet die Middleware mit 400.**
 - Die Vorgabe bleibt lokal nutzbar. Kein `*` als bequemer Ersatz für die Hostliste.
 - Hostprüfung und Benutzerberechtigung bleiben verschiedene Prüfungen.
@@ -362,7 +369,8 @@ MYSQL_ROOT_PASSWORD=REPLACE_WITH_ROOT_DB_PASSWORD
 DEMO_PASSWORD=REPLACE_WITH_LONG_DEMO_PASSWORD
 
 # Nur auf der Azure-VM: Etappe A (HTTP) und Etappe B (Caddy).
-ALLOWED_HOSTS=localhost,127.0.0.1,REPLACE_WITH_PUBLIC_IP,REPLACE_WITH_DNS_NAME
+# Kommagetrennt, ohne http:// und ohne Port, z. B. localhost,127.0.0.1,20.79.155.100
+ALLOWED_HOSTS=localhost,127.0.0.1,REPLACE_WITH_PUBLIC_IP
 API_DOMAIN=REPLACE_WITH_DNS_NAME
 ```
 
@@ -680,6 +688,22 @@ nano .env.deploy
 - **Neue Passwörter nur für die VM wählen.** Nicht die lokalen Werte wiederverwenden.
 - `ALLOWED_HOSTS`: `localhost,127.0.0.1,` gefolgt von der öffentlichen IP der VM.
 - `API_DOMAIN` bleibt bis Etappe B ein Platzhalter.
+
+So sieht `.env.deploy` auf der VM danach aus (Beispiel-IP `20.79.155.100`):
+
+```dotenv
+MYSQL_PASSWORD=eigenes-langes-app-passwort
+MYSQL_ROOT_PASSWORD=eigenes-langes-root-passwort
+DEMO_PASSWORD=eigenes-langes-demo-passwort
+
+# Nur auf der Azure-VM: Etappe A (HTTP) und Etappe B (Caddy).
+# Kommagetrennt, ohne http:// und ohne Port, z. B. localhost,127.0.0.1,20.79.155.100
+ALLOWED_HOSTS=localhost,127.0.0.1,20.79.155.100
+API_DOMAIN=REPLACE_WITH_DNS_NAME
+```
+
+- **Nur den Hostnamen eintragen.** Falsch: `http://20.79.155.100` oder `20.79.155.100:80`.
+- `localhost` und `127.0.0.1` bleiben drin: `curl http://127.0.0.1/health` auf der VM selbst soll weiter funktionieren.
 - In `nano`: Speichern mit `Strg+O`, Enter; Beenden mit `Strg+X`.
 - `chmod 600` erlaubt nur dem eigenen Benutzer das Lesen der Datei.
 
@@ -716,6 +740,48 @@ services:
 | `restart: unless-stopped` | Container starten nach Absturz oder VM-Neustart wieder. |
 | `ALLOWED_HOSTS` | Kommt aus `.env.deploy`; enthält die öffentliche IP. |
 | `"80:8000"` | VM-Port 80 auf allen Schnittstellen → Container-Port 8000. |
+
+**Die Datei ändert drei Dinge – nicht nur den Port.**
+
+**Wie das Zusammenführen funktioniert**
+
+- `compose.deploy.yaml` beschreibt die vollständigen Dienste: Image, Datenbank, Volume, Healthcheck.
+- `compose.http.yaml` enthält nur die **Unterschiede** für Etappe A. Allein ist sie nicht lauffähig.
+- Mit `-f compose.deploy.yaml -f compose.http.yaml` legt Compose die zweite Datei über die erste.
+- Einzelwerte wie `restart` werden ergänzt oder überschrieben. Einträge unter `environment` werden einzeln ersetzt; die übrigen Variablen bleiben.
+- Prüfen, was am Ende wirklich gilt: `docker compose "${http[@]}" config` zeigt das zusammengeführte Ergebnis.
+
+**1. `restart: unless-stopped`**
+
+- Lokal starten wir Container von Hand; ein Neustart-Verhalten brauchen wir dort nicht.
+- Auf der VM soll die API nach einem Absturz oder einem Neustart der VM von selbst wieder laufen.
+- `unless-stopped`: Docker startet den Container immer neu – außer wir haben ihn selbst mit `docker compose stop` angehalten.
+- Beide Dienste erhalten die Regel. Ohne laufende Datenbank wäre die API nutzlos.
+
+**2. `ALLOWED_HOSTS` aus `.env.deploy`**
+
+- In `compose.deploy.yaml` steht fest `ALLOWED_HOSTS: localhost,127.0.0.1`. Das reicht für Tests auf dem eigenen Rechner.
+- Der Browser schickt bei `http://20.79.155.100/health` den Header `Host: 20.79.155.100`.
+- Die `TrustedHostMiddleware` aus Abschnitt 3.1 vergleicht diesen Header mit der Liste. Fehlt die IP, antwortet sie mit **`400 Invalid host header`** – noch bevor eine Route läuft.
+- `${ALLOWED_HOSTS:?Set ALLOWED_HOSTS}` liest den Wert aus `.env.deploy` (Beispiel in Abschnitt 5.4).
+- `:?` bricht den Start mit der Meldung `Set ALLOWED_HOSTS` ab, wenn die Variable fehlt oder leer ist. So fällt ein Tippfehler sofort auf, nicht erst im Browser.
+
+**3. Port 80 statt 127.0.0.1:8000**
+
+- In `compose.deploy.yaml` steht `"127.0.0.1:8000:8000"`. Die API ist dann **nur auf der VM selbst** erreichbar.
+- `"80:8000"` bedeutet: Port 80 der VM auf **allen** Netzwerkschnittstellen → Port 8000 im Container.
+- Port 80 ist der Standardport für HTTP. Darum genügt im Browser `http://20.79.155.100` ohne `:8000`.
+- **Ohne `!override` würde Compose beide Listen zusammenführen.** Der Container hätte dann beide Mappings.
+- `!override` ersetzt die Portliste vollständig. Es bleibt genau eine Regel: `80:8000`.
+- Damit Anfragen von außen ankommen, muss Port 80 zusätzlich in der Azure-Firewall offen sein (Abschnitt 6.3).
+
+```mermaid
+flowchart LR
+    B["Browser<br/>http://20.79.155.100"] -->|"Port 80"| N["Azure-Firewall (NSG)<br/>Regel allow-http"]
+    N -->|"Port 80"| V["VM"]
+    V -->|"80:8000"| A["API-Container<br/>Uvicorn :8000<br/>prüft ALLOWED_HOSTS"]
+    A -->|"Docker-Netzwerk"| D["MySQL-Container"]
+```
 
 ```powershell
 # Lokal im Projektordner.

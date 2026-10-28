@@ -57,10 +57,15 @@ def create_app(show_docs=False):
     # API8 in main.py: Host-Prüfung für die gesamte App registrieren.
     # Die Middleware prüft vor der Route: unbekannter Zielname -> 400.
     # Beim Deployment den tatsächlichen API-Domainnamen ergänzen.
-    # Die Variable enthält Hostnamen ohne https:// und ohne Leerzeichen.
-    allowed_hosts = os.environ.get(
-        "ALLOWED_HOSTS", "localhost,127.0.0.1"
-    ).split(",")
+    # Die Variable enthält Hostnamen ohne https:// und ohne Port, kommagetrennt.
+    # strip() entfernt Leerzeichen; leere Einträge (z. B. "a,,b") fallen weg.
+    allowed_hosts = [
+        host.strip()
+        for host in os.environ.get(
+            "ALLOWED_HOSTS", "localhost,127.0.0.1"
+        ).split(",")
+        if host.strip()
+    ]
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=allowed_hosts
     )
