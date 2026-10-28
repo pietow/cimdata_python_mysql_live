@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, String
 from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.orm import relationship
@@ -36,6 +36,7 @@ class Course(Base):
 
 class Booking(Base):
     __tablename__ = "bookings"
+    __table_args__ = (Index("ix_bookings_date_id", "booking_date", "id"), )   # CREATE INDEX ix_bookings_date_id ON bookings (booking_date, id)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
