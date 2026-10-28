@@ -1,0 +1,684 @@
+{
+  "info": {
+    "name": "Tag 11 – Hogwarts: Berichte messen und prüfen",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "# Wann welche Collection?\n\n| Stand | Collection |\n| --- | --- |\n| Tag 10 am Tag-10-Server | Tag-10-Collection |\n| Tag 11 am Tag-11-Server | Diese Collection: 00 → 01 → 02 → 03 |\n\n- Start: python -m uvicorn tag11.main:app --host 127.0.0.1 --port 8000. Alten Server zuvor stoppen.\n- Konten: vector und hagrid als staff, babbling als reader. Passwörter nur lokal in den Collection-Variablen setzen. Keine gleichnamigen Environment-Variablen verwenden.\n- report_date auf einen vorhandenen Berichtstag setzen. Die 10.000 temporären SQL-Zeilen sind kein API-Datenbestand. Ein leerer Bericht ist korrekt; die feste ORM-Demo läuft separat in der Testdatenbank.\n- Ordner 01 übernimmt after_id automatisch aus der ersten Antwort wie ein Frontend. Beim Datumswechsel wieder mit der ersten Seite beginnen.\n- Die Collection legt keine Fachdatensätze an und löscht keine. Nur Login und Logout verändern den Tokenbestand.\n- Zum Abschluss bzw. nach Abbruch Ordner 03 ausführen. Passwörter und Token vor dem Teilen leeren. Login-Bodies verwenden JSON.stringify für Sonderzeichen.\n- Postman prüft Verhalten, keine Laufzeit. Keine feste Millisekunden-Grenze behaupten."
+  },
+  "item": [
+    {
+      "name": "00 – Anmeldung",
+      "description": "Tag-11-Server starten; Passwörter nur lokal setzen. Danach Ordner 01.",
+      "item": [
+        {
+          "name": "API erreichbar",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "vector: anmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{{login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('vector_token')) { throw new Error('Vor erneutem Login das vorhandene Token in Ordner 03 abmelden.'); }",
+                  "const password = pm.collectionVariables.get('vector_password');",
+                  "if (!password) { throw new Error('Lokales Passwort für vector eintragen.'); }",
+                  "pm.variables.set('login_body', JSON.stringify({username: 'vector', password: password}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().access_token;",
+                  "  pm.test('Token erhalten', function () { pm.expect(typeof token).to.eql('string'); pm.expect(token.length > 0).to.eql(true); });",
+                  "  pm.collectionVariables.set('vector_token', token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "hagrid: anmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{{login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('hagrid_token')) { throw new Error('Vor erneutem Login das vorhandene Token in Ordner 03 abmelden.'); }",
+                  "const password = pm.collectionVariables.get('hagrid_password');",
+                  "if (!password) { throw new Error('Lokales Passwort für hagrid eintragen.'); }",
+                  "pm.variables.set('login_body', JSON.stringify({username: 'hagrid', password: password}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().access_token;",
+                  "  pm.test('Token erhalten', function () { pm.expect(typeof token).to.eql('string'); pm.expect(token.length > 0).to.eql(true); });",
+                  "  pm.collectionVariables.set('hagrid_token', token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "babbling: anmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{{login_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('babbling_token')) { throw new Error('Vor erneutem Login das vorhandene Token in Ordner 03 abmelden.'); }",
+                  "const password = pm.collectionVariables.get('babbling_password');",
+                  "if (!password) { throw new Error('Lokales Passwort für babbling eintragen.'); }",
+                  "pm.variables.set('login_body', JSON.stringify({username: 'babbling', password: password}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().access_token;",
+                  "  pm.test('Token erhalten', function () { pm.expect(typeof token).to.eql('string'); pm.expect(token.length > 0).to.eql(true); });",
+                  "  pm.collectionVariables.set('babbling_token', token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 – Tagesbericht und Seiten",
+      "description": "Erste Berichtsseite zuerst ausführen, dann Folgeseite und Hagrids Bericht. Ein Tag ohne Treffer liefert korrekt []. Die vollständige Rechtetrennung prüfen zusätzlich die Tests mit festen Daten.",
+      "item": [
+        {
+          "name": "Vector: erste Berichtsseite",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&limit=2&after_id=0",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Vorher report_date auf einen vorhandenen Berichtstag setzen. Speichert die letzte ID automatisch. Bei Datumswechsel diese Anfrage erneut ausführen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const rows = pm.response.json();",
+                  "  pm.test('Höchstens zwei Zeilen am gewählten Tag', function () {",
+                  "    pm.expect(Array.isArray(rows)).to.eql(true);",
+                  "    pm.expect(rows.length <= 2).to.eql(true);",
+                  "    pm.expect(rows.every(row => row.booking_date === pm.collectionVariables.get('report_date'))).to.eql(true);",
+                  "  });",
+                  "  pm.test('Öffentliche Berichtsfelder', function () {",
+                  "    rows.forEach(row => pm.expect(row).to.have.keys('id', 'student_name', 'course_title', 'booking_date'));",
+                  "  });",
+                  "  pm.collectionVariables.set('first_page_ids', JSON.stringify(rows.map(row => row.id)));",
+                  "  // Wie ein Frontend: letzte ID merken und bei der Folgeanfrage mitsenden.",
+                  "  pm.collectionVariables.set('report_after_id', rows.length ? String(rows[rows.length - 1].id) : '0');",
+                  "  pm.collectionVariables.set('page_day', pm.collectionVariables.get('report_date'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vector: nächste Berichtsseite",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{page_day}}&limit=2&after_id={{report_after_id}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Verwendet Datum und letzte ID der ersten Antwort. Kein manuelles Berechnen der nächsten ID."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('page_day')) { throw new Error('Zuerst die erste Berichtsseite abrufen.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const rows = pm.response.json();",
+                  "  const after = Number(pm.collectionVariables.get('report_after_id'));",
+                  "  const firstIds = JSON.parse(pm.collectionVariables.get('first_page_ids') || '[]');",
+                  "  pm.test('Seite setzt hinter der letzten ID fort', function () {",
+                  "    pm.expect(rows.length <= 2).to.eql(true);",
+                  "    pm.expect(rows.every(row => row.id > after && !firstIds.includes(row.id))).to.eql(true);",
+                  "    pm.expect(rows.every(row => row.booking_date === pm.collectionVariables.get('page_day'))).to.eql(true);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hagrid: eigener Bericht",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&limit=20",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hagrid_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const firstIds = JSON.parse(pm.collectionVariables.get('first_page_ids') || '[]');",
+                  "  pm.test('Hagrid erhält keine IDs aus Vectors geprüfter Seite', function () {",
+                  "    pm.expect(pm.response.json().every(row => !firstIds.includes(row.id))).to.eql(true);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 – Rechte und Eingabegrenzen",
+      "description": "Alle Beispiele sind Leseanfragen. Erwartete Ablehnungen sind erfolgreiche Prüfungen; danach abmelden.",
+      "item": [
+        {
+          "name": "Ohne Anmeldung",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reader darf Bericht nicht lesen",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{babbling_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Datum fehlt",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Datum ungültig",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date=kein-datum",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Seitengröße null",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&limit=0",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Seitengröße zu groß",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&limit=51",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cursor negativ",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&after_id=-1",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 – Abmelden",
+      "description": "Zum Abschluss und nach Abbruch alle drei Token widerrufen. Passwörter danach lokal leeren, bevor die Collection geteilt wird.",
+      "item": [
+        {
+          "name": "vector: abmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Auch nach einem Abbruch hier verbliebene Token widerrufen. 401 bedeutet: kein gültiges Token mehr."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Abgemeldet oder bereits ungültig', function () { pm.expect([204, 401].includes(pm.response.code)).to.eql(true); });",
+                  "if ([204, 401].includes(pm.response.code)) { pm.collectionVariables.set('vector_token', ''); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "hagrid: abmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hagrid_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Auch nach einem Abbruch hier verbliebene Token widerrufen. 401 bedeutet: kein gültiges Token mehr."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Abgemeldet oder bereits ungültig', function () { pm.expect([204, 401].includes(pm.response.code)).to.eql(true); });",
+                  "if ([204, 401].includes(pm.response.code)) { pm.collectionVariables.set('hagrid_token', ''); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "babbling: abmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{babbling_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Auch nach einem Abbruch hier verbliebene Token widerrufen. 401 bedeutet: kein gültiges Token mehr."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Abgemeldet oder bereits ungültig', function () { pm.expect([204, 401].includes(pm.response.code)).to.eql(true); });",
+                  "if ([204, 401].includes(pm.response.code)) { pm.collectionVariables.set('babbling_token', ''); }",
+                  "",
+                  "pm.collectionVariables.set('report_after_id', '0');",
+                  "pm.collectionVariables.set('first_page_ids', '');",
+                  "pm.collectionVariables.set('page_day', '');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "report_date",
+      "value": "1993-09-01",
+      "type": "string"
+    },
+    {
+      "key": "vector_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vector_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "hagrid_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "hagrid_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "babbling_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "babbling_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "report_after_id",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "first_page_ids",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "page_day",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  }
+}
