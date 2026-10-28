@@ -5,17 +5,20 @@
 - **Wir veröffentlichen die bestehende Anwendung aus Tag 12.**
 - Anmeldung, Zuständigkeiten und der Async-Bericht bleiben erhalten.
 - FastAPI und MySQL laufen in getrennten Containern.
-- Railway stellt den öffentlichen HTTPS-Zugang bereit.
+- Eine eigene **Azure-VM** mit Docker betreibt dieselben Container in der Cloud.
+- Zuerst veröffentlichen wir **ohne SSL** über HTTP; danach übernimmt ein **Caddy-Container** HTTPS.
 
 | Etappe | Sichtbares Ergebnis |
 | --- | --- |
 | Git und GitHub | Ein nachvollziehbarer Projektstand liegt im eigenen Repository. |
 | Docker-Exkursion | Die App läuft lokal im Container und verwendet einen MySQL-Container. |
-| Railway | Dieselbe Anwendung ist über eine HTTPS-Adresse erreichbar. |
+| Azure-VM | Eine Linux-VM mit Docker ist per SSH erreichbar. |
+| Etappe A: HTTP | Die App antwortet unter `http://ÖFFENTLICHE-IP`. |
+| Etappe B: Caddy | Dieselbe App antwortet unter `https://NAME.REGION.cloudapp.azure.com`. |
 | Änderung veröffentlichen | Eine neue Versionsnummer erscheint; gespeicherte Kurse bleiben erhalten. |
-| Bonus CI/CD | GitHub Actions prüft den Stand; Railway veröffentlicht nach erfolgreichen Prüfungen. |
+| Bonus CI/CD | GitHub Actions prüft den Stand und aktualisiert danach die VM per SSH. |
 
-- **Pflichtziel: lokal starten → verpacken → veröffentlichen → prüfen → aktualisieren.**
+- **Pflichtziel: lokal starten → verpacken → auf der VM starten → HTTPS ergänzen → aktualisieren.**
 - Docker-Konfiguration und Einrichtungsprogramm werden angeleitet übernommen.
 - Ein Worker genügt für die Demonstration. Sync- und Async-Routen funktionieren gemeinsam.
 
@@ -26,12 +29,14 @@
 | Auftrag, Voraussetzungen und Git | 60 Minuten |
 | Docker verstehen und App vorbereiten | 75 Minuten |
 | Zwei Container lokal verbinden und prüfen | 75 Minuten |
-| Railway, Datenbank und Migration | 90 Minuten |
-| Postman, Update und Fehlersuche | 75 Minuten |
+| Azure-VM, Docker und Etappe A (HTTP) | 90 Minuten |
+| Etappe B: Caddy, HTTPS und Postman | 60 Minuten |
+| Update und Fehlersuche | 45 Minuten |
 | Transfer und Besprechung | 30 Minuten |
 
 - Bei zwei Tagen: Tag A bis einschließlich Abschnitt 4; Tag B ab Abschnitt 5.
-- **Accounts, Docker Desktop und den Projektstand vorher prüfen.**
+- **Azure-Zugang (z. B. Azure for Students), Docker Desktop und den Projektstand vorher prüfen.**
+- Vorab klären, ob Teilnehmende eine VM anlegen dürfen (Kontingent, Region, Richtlinien des Abonnements).
 - Grundlage ist das bereitgestellte [Cookbook-Kapitel 12][cookbook]. Quellen und Abweichungen stehen im [Anhang](#anhang-quellen-und-abgrenzung).
 
 ## 0. Unser Ausgangspunkt
@@ -48,13 +53,15 @@ Set-Location "$env:USERPROFILE\hogwarts-sql"
 git --version
 docker version
 python --version
+ssh -V
 python -m pip check
 python -m alembic current
 ```
 
 - Erwartet: Docker-Client und Docker-Server sind erreichbar; Revision `0005`.
+- `ssh -V` prüft den OpenSSH-Client von Windows; wir brauchen ihn für die VM.
 - Dozentenvorbereitung: Migrationen einmal auf einer leeren MySQL-Datenbank prüfen.
-- **Eine Cloud-Datenbank enthält anfangs weder unsere Tabellen noch unsere Konten.**
+- **Eine neue Datenbank auf der VM enthält anfangs weder unsere Tabellen noch unsere Konten.**
 - Den bisherigen Uvicorn-Server vor Abschnitt 4 beenden, damit Port 8000 frei ist.
 
 ### Vier Orte auseinanderhalten
@@ -64,7 +71,7 @@ python -m alembic current
 | Arbeitsordner | Bearbeitete Python-Dateien und lokale Konfiguration. |
 | GitHub | Hochgeladene Commits; keine laufende App und keine MySQL-Daten. |
 | App-Container | Python, Pakete und eine Kopie unseres Anwendungscodes. |
-| MySQL-Volume | Dauerhaft gespeicherte Datenbankdateien. |
+| MySQL-Volume | Dauerhaft gespeicherte Datenbankdateien – lokal und auf der VM getrennt. |
 
 - Denkfrage: Überträgt `git push` auch unsere Kurse und Benutzerkonten?
 - **Nein. Quellcode und Datenbankinhalt haben unterschiedliche Speicherorte.**
@@ -73,7 +80,7 @@ python -m alembic current
 
 - **Git speichert Projektstände; GitHub stellt das entfernte Repository bereit.**
 - Ein Commit enthält ausgewählte Dateiänderungen und eine Beschreibung.
-- `push` überträgt vorhandene Commits zu GitHub.
+- `push` überträgt vorhandene Commits zu GitHub. Die VM holt sie später mit `git pull`.
 
 ### 1.1 Lokale Dateien ausschließen
 
@@ -155,25 +162,39 @@ git push -u origin main
 | Container | Laufende Umgebung mit eigenem Prozess und Netzwerk. |
 | Port | Anschluss eines Dienstes, etwa 8000 für die API. |
 | Volume | Speicher, der einen Containerwechsel überlebt. |
-| Docker Compose | Beschreibt und startet mehrere lokale Dienste zusammen. |
+| Docker Compose | Beschreibt und startet mehrere Dienste zusammen – lokal und auf der VM. |
 
 - Container teilen einen Kernel; Docker Desktop stellt auf Windows die Linux-Umgebung bereit.
+- Auf der Azure-VM läuft Docker direkt auf Ubuntu Linux.
 - Denkfrage: Wo bleiben die Kurse beim Containerwechsel? Im MySQL-Volume.
 
 ### Unser Aufbau
 
+Etappe A – ohne SSL:
+
 ```mermaid
 flowchart TD
-    P["Postman"] -->|"HTTPS"| R["Railway-Zugang und Zertifikat"]
-    R -->|"Weiterleitung"| A["FastAPI und Uvicorn: App-Container"]
-    A -->|"privates Netzwerk"| D["MySQL-Container"]
-    D --> V["Dauerhaftes Volume"]
+    P["Postman"] -->|"HTTP, Port 80 – unverschlüsselt"| N["Azure-Netzwerksicherheitsgruppe"]
+    N --> A["FastAPI und Uvicorn: App-Container"]
+    A -->|"Docker-Netzwerk"| D["MySQL-Container"]
+    D --> V["Volume auf der VM-Festplatte"]
 ```
 
-- **Railway übernimmt den öffentlichen HTTPS-Zugang. Eigenes Nginx ist hier nicht nötig.**
-- Ein Reverse Proxy nimmt Anfragen entgegen und leitet sie an die App weiter.
-- Die TLS-Verschlüsselung endet am Railway-Zugang; der nächste Abschnitt ist die interne Weiterleitung.
-- Wir verwenden die Railway-Domain. Eine eigene Domain ist eine spätere Erweiterung.
+Etappe B – mit Caddy:
+
+```mermaid
+flowchart TD
+    P["Postman"] -->|"HTTPS, Port 443"| N["Azure-Netzwerksicherheitsgruppe"]
+    N --> C["Caddy-Container: Zertifikat und Weiterleitung"]
+    C -->|"HTTP im Docker-Netzwerk"| A["FastAPI und Uvicorn: App-Container"]
+    A -->|"Docker-Netzwerk"| D["MySQL-Container"]
+    D --> V["Volume auf der VM-Festplatte"]
+```
+
+- **Ein Reverse Proxy nimmt Anfragen entgegen und leitet sie an die App weiter.**
+- Caddy holt das Zertifikat automatisch bei Let's Encrypt und erneuert es selbst.
+- Die TLS-Verschlüsselung endet bei Caddy; die Weiterleitung zur App bleibt innerhalb der VM.
+- Wir verwenden den kostenlosen Azure-DNS-Namen. Eine eigene Domain ist eine spätere Erweiterung.
 
 ## 3. Unsere App für den Container vorbereiten
 
@@ -195,7 +216,7 @@ flowchart TD
     )
 ```
 
-- **Der Cloud-Hostname muss erlaubt sein, sonst antwortet die Middleware mit 400.**
+- **Die öffentliche IP bzw. der DNS-Name der VM muss erlaubt sein, sonst antwortet die Middleware mit 400.**
 - Die Vorgabe bleibt lokal nutzbar. Kein `*` als bequemer Ersatz für die Hostliste.
 - Hostprüfung und Benutzerberechtigung bleiben verschiedene Prüfungen.
 
@@ -246,7 +267,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "tag13.main:app",
         host="0.0.0.0",  # Im Container auch externe Weiterleitungen annehmen.
-        port=int(os.environ.get("PORT", "8000")),  # Railway gibt PORT vor.
+        port=int(os.environ.get("PORT", "8000")),  # Port im Container.
         workers=1,       # Ein Prozess; kann trotzdem viele Requests bedienen.
         proxy_headers=True,  # Vertrauenswürdige Proxy-Informationen auswerten.
     )
@@ -255,9 +276,10 @@ if __name__ == "__main__":
 | Einstellung | Warum? |
 | --- | --- |
 | `0.0.0.0` | Der Dienst lauscht auf allen IPv4-Schnittstellen des Containers. Es ist keine Browseradresse. |
-| `PORT` | Der Server lauscht auf dem von Railway erwarteten Port. |
-| Kein `reload` | Der veröffentlichte Code wird durch ein neues Deployment ersetzt. |
+| `PORT` | Port im Container. Welcher VM-Port dorthin führt, legt Compose fest. |
+| Kein `reload` | Der veröffentlichte Code wird durch ein neues Image ersetzt. |
 | Ein Worker | Kleine, verständliche Demo; jeder weitere Worker hätte eigene Pools und Speicher. |
+| `proxy_headers` | Hinter Caddy erfährt die App so das ursprüngliche Protokoll `https`. |
 
 
 ### 3.3 Das Dockerfile
@@ -323,25 +345,30 @@ fastAPI_cookbook
 | --- | --- |
 | Python auf Windows, bisher | `127.0.0.1:3307`, sofern so im bisherigen Compose veröffentlicht. |
 | App-Container im neuen Compose | `db:3306`, über den Dienstnamen im gemeinsamen Netzwerk. |
-| App auf Railway | Privater Host und Port des dortigen MySQL-Dienstes. |
+| App-Container auf der Azure-VM | Ebenfalls `db:3306` – dieselbe Compose-Datei. |
 
 - **`localhost` im App-Container bezeichnet diesen App-Container.**
 - MySQL läuft daneben unter `db`. Die neue Demo erhält ein eigenes Volume.
-- **Railway führt diese Compose-Datei nicht direkt aus.** Dort legen wir dieselben zwei Dienste einzeln an.
+- **Auf der VM verwenden wir dieselbe Compose-Datei.** Eine kleine Ergänzungsdatei ändert nur den öffentlichen Zugang.
 
 <!-- file: .env.deploy.example -->
-- Datei: `.env.deploy.example`; als `.env.deploy` kopieren und alle drei Platzhalter ersetzen.
+- Datei: `.env.deploy.example`; als `.env.deploy` kopieren und die Platzhalter ersetzen.
 - Drei unterschiedliche lange Passwörter wählen; keine echten persönlichen Passwörter verwenden.
+- Die beiden unteren Zeilen werden erst auf der VM gebraucht; lokal dürfen sie Platzhalter bleiben.
 
 ```dotenv
 MYSQL_PASSWORD=REPLACE_WITH_APP_DB_PASSWORD
 MYSQL_ROOT_PASSWORD=REPLACE_WITH_ROOT_DB_PASSWORD
 DEMO_PASSWORD=REPLACE_WITH_LONG_DEMO_PASSWORD
+
+# Nur auf der Azure-VM: Etappe A (HTTP) und Etappe B (Caddy).
+ALLOWED_HOSTS=localhost,127.0.0.1,REPLACE_WITH_PUBLIC_IP,REPLACE_WITH_DNS_NAME
+API_DOMAIN=REPLACE_WITH_DNS_NAME
 ```
 
 ```powershell
 Copy-Item .\.env.deploy.example .\.env.deploy
-# .env.deploy jetzt im Editor öffnen und die Werte ersetzen.
+# .env.deploy jetzt im Editor öffnen und die drei Passwörter ersetzen.
 ```
 
 <!-- file: compose.deploy.yaml -->
@@ -520,113 +547,359 @@ docker compose @deploy run --rm api python -m tag13.prepare_demo
 - Ordner **Demo** und **01** abwählen: Sie gehören zum getrennten Hinweisdienst auf Port 8001.
 - **Der bekannte API-Vertrag funktioniert jetzt mit zwei lokalen Containern.**
 
-## 5. Railway: zwei Dienste in der Cloud
+## 5. Azure: eine Linux-VM mit Docker vorbereiten
 
-### 5.1 Projekt und Datenbank anlegen
+- **Eine VM ist ein gemieteter Linux-Rechner. Wir verwalten ihn selbst – auch Updates und Firewall.**
+- Auf der VM laufen genau die Container, die wir lokal getestet haben.
+- Der Unterschied zu einer Plattform wie Railway: Mehr Kontrolle, aber auch mehr Verantwortung.
 
-1. Bei Railway anmelden und ein leeres Projekt erstellen.
-2. Einen Dienst aus einem **Docker Image** erstellen: `mysql:8.4`; Dienstname genau `MySQL`.
-3. Vor der Einrichtung die vier Variablen aus der folgenden Tabelle und ein Volume mit Mount-Pfad `/var/lib/mysql` setzen.
-4. Änderungen anwenden und in den Logs warten, bis MySQL Verbindungen annimmt.
-5. Beide Dienste in derselben Railway-Umgebung betreiben; `production` genügt für unseren Unterricht.
+### 5.1 VM im Azure-Portal anlegen
 
-| Variable am MySQL-Dienst | Wert |
-| --- | --- |
-| `MYSQL_DATABASE` | `hogwarts` |
-| `MYSQL_USER` | `hogwarts_app` |
-| `MYSQL_PASSWORD` | Neues langes Cloud-Datenbankpasswort. |
-| `MYSQL_ROOT_PASSWORD` | Anderes langes Passwort für die Datenbankadministration. |
+1. Im [Azure-Portal](https://portal.azure.com) **Virtuelle Computer → Erstellen → Virtueller Azure-Computer** wählen.
+2. Ressourcengruppe neu: `rg-hogwarts`. VM-Name: `vm-hogwarts`. Region: z. B. `Germany West Central`.
+3. Image: **Ubuntu Server 24.04 LTS**. Größe: z. B. `Standard_B2s` (2 vCPU, 4 GiB RAM).
+4. Authentifizierung: **Öffentlicher SSH-Schlüssel**, Benutzername `azureuser`, Quelle **Neues Schlüsselpaar generieren**, Schlüsselpaarname `vm-hogwarts_key`.
+5. Eingehende Ports: zunächst nur **SSH (22)**. HTTP und HTTPS öffnen wir bewusst später.
+6. **Überprüfen + erstellen** → **Privaten Schlüssel herunterladen und Ressource erstellen**. Der Browser speichert `vm-hogwarts_key.pem`.
+7. Nach der Bereitstellung die **öffentliche IP-Adresse** notieren.
 
-- **Nur die API wird öffentlich. MySQL bleibt im privaten Netzwerk.**
-- Für die Datenbank weder eine öffentliche Domain noch einen TCP-Proxy einrichten.
-- Wir verwenden lokal und in der Cloud das offizielle Image mit demselben Tag; die Datenbestände sind getrennt.
-- Diese vier MySQL-Variablen richten eine leere Datenbank ein. Bei gefülltem Volume ändern sie vorhandene Passwörter nicht nachträglich.
-- Vorab Kontoguthaben und Accountfreigabe prüfen; der Trial ist keine Zusage für dauerhaften Gratisbetrieb.
+- **MySQL und das Bauen des Images brauchen Arbeitsspeicher.** Sehr kleine Größen mit 1 GiB RAM scheitern leicht.
+- Empfehlung: In der Netzwerksicherheitsgruppe die SSH-Regel auf **Meine IP-Adresse** als Quelle einschränken.
+- Für MySQL wird **kein** Port geöffnet. Die Datenbank bleibt im Docker-Netzwerk der VM.
+- **Die `.pem`-Datei ist der private Schlüssel.** Azure bietet den Download nur einmal an. Den öffentlichen Teil hat Azure bereits auf der VM hinterlegt.
 
-### 5.2 Den vollständigen Stand nach GitHub übertragen
+<details>
+<summary>Alternative: dieselbe VM mit der Azure CLI anlegen</summary>
 
 ```powershell
-git add .
-git diff --cached --stat
-git diff --cached
-git commit -m "App containerisieren und lokalen Deploymentweg ergaenzen"
+# Ohne Portal: Schlüsselpaar lokal erzeugen; legt vm-hogwarts_key.pem und vm-hogwarts_key.pem.pub an.
+ssh-keygen -t ed25519 -f "$HOME\.ssh\vm-hogwarts_key.pem" -C "hogwarts-azure"
+az login
+az group create --name rg-hogwarts --location germanywestcentral
+# hogwarts-DEINNAME muss in der Region eindeutig sein; nur Kleinbuchstaben, Ziffern, Bindestrich.
+az vm create `
+  --resource-group rg-hogwarts `
+  --name vm-hogwarts `
+  --image Ubuntu2404 `
+  --size Standard_B2s `
+  --admin-username azureuser `
+  --ssh-key-values "$HOME\.ssh\vm-hogwarts_key.pem.pub" `
+  --public-ip-sku Standard `
+  --public-ip-address-dns-name hogwarts-DEINNAME
+az vm show --resource-group rg-hogwarts --name vm-hogwarts --show-details --query "{ip:publicIps, fqdn:fqdns}"
+```
+
+- `az vm create` öffnet bei Linux standardmäßig nur Port 22.
+- Der DNS-Name aus `--public-ip-address-dns-name` wird erst in Etappe B gebraucht.
+
+</details>
+
+### 5.2 Privaten Schlüssel ablegen und schützen
+
+```powershell
+# Einmalig: Schlüssel aus dem Download-Ordner nach .ssh verschieben.
+New-Item -ItemType Directory -Force "$HOME\.ssh" | Out-Null
+Move-Item "$HOME\Downloads\vm-hogwarts_key.pem" "$HOME\.ssh\vm-hogwarts_key.pem"
+
+# Nur der eigene Benutzer darf die Datei lesen.
+icacls "$HOME\.ssh\vm-hogwarts_key.pem" /inheritance:r
+icacls "$HOME\.ssh\vm-hogwarts_key.pem" /grant:r "$($env:USERNAME):R"
+icacls "$HOME\.ssh\vm-hogwarts_key.pem"
+```
+
+- `/inheritance:r` entfernt alle vom Ordner geerbten Rechte.
+- `/grant:r "<Benutzer>:R"` gibt nur dem eigenen Benutzer Leserechte.
+- **Ohne diesen Schritt** verweigert OpenSSH den Schlüssel mit `UNPROTECTED PRIVATE KEY FILE`.
+- Die `.pem`-Datei gehört **nie** ins Projekt-Repository.
+
+### 5.3 Per SSH verbinden und Docker installieren
+
+```powershell
+# ÖFFENTLICHE-IP durch die notierte Adresse ersetzen.
+ssh -i "$HOME\.ssh\vm-hogwarts_key.pem" azureuser@ÖFFENTLICHE-IP
+```
+
+- Beim ersten Verbinden fragt SSH nach dem Host-Fingerprint; mit `yes` bestätigen.
+- **Ab hier laufen die Befehle in der Linux-Shell der VM, nicht in PowerShell.**
+- Wir installieren Docker Engine und das Compose-Plugin aus dem offiziellen Docker-Repository.
+
+```bash
+# Systempakete aktualisieren; git wird zum Klonen gebraucht.
+sudo apt-get update
+sudo apt-get upgrade -y
+sudo apt-get install -y ca-certificates curl git
+
+# Offizielles Docker-Repository mit Signaturschlüssel einbinden.
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# docker ohne sudo verwenden; wirkt erst nach erneuter Anmeldung.
+sudo usermod -aG docker "$USER"
+exit
+```
+
+```powershell
+ssh -i "$HOME\.ssh\vm-hogwarts_key.pem" azureuser@ÖFFENTLICHE-IP
+```
+
+```bash
+docker version
+docker compose version
+docker run --rm hello-world
+```
+
+- Erwartet: Client **und** Server werden angezeigt; `hello-world` gibt eine Begrüßung aus.
+- **Die Gruppe `docker` entspricht praktisch Root-Rechten.** Nur vertrauenswürdige Konten aufnehmen.
+- Der Docker-Dienst startet nach einem VM-Neustart automatisch.
+
+### 5.4 Projekt auf die VM holen und Zugangsdaten anlegen
+
+```bash
+# Zielordner hogwarts-api: Die folgenden Abschnitte arbeiten mit ~/hogwarts-api.
+git clone https://github.com/pietow/cimdata_python_mysql_live.git hogwarts-api
+cd hogwarts-api
+git log --oneline -1
+```
+
+- Öffentliches Repository: Klonen ohne Anmeldung.
+- Privates Repository: einen schreibgeschützten **Deploy Key** für dieses Repository verwenden; kein persönliches Passwort auf der VM speichern.
+- **Die VM holt den Code von GitHub. Das lokal gebaute Image wird nicht übertragen.**
+
+```bash
+cp .env.deploy.example .env.deploy
+chmod 600 .env.deploy
+nano .env.deploy
+```
+
+- **Neue Passwörter nur für die VM wählen.** Nicht die lokalen Werte wiederverwenden.
+- `ALLOWED_HOSTS`: `localhost,127.0.0.1,` gefolgt von der öffentlichen IP der VM.
+- `API_DOMAIN` bleibt bis Etappe B ein Platzhalter.
+- In `nano`: Speichern mit `Strg+O`, Enter; Beenden mit `Strg+X`.
+- `chmod 600` erlaubt nur dem eigenen Benutzer das Lesen der Datei.
+
+## 6. Etappe A: veröffentlichen ohne SSL
+
+- **Ziel: Die App ist aus dem Internet über `http://ÖFFENTLICHE-IP` erreichbar.**
+- Uvicorn lauscht weiter auf Port 8000 im Container; die VM leitet Port 80 dorthin.
+- Diese Etappe zeigt den Aufbau ohne weitere Bausteine. Sie ist **kein Dauerzustand**.
+
+### 6.1 Ergänzungsdatei für den HTTP-Zugang
+
+<!-- file: compose.http.yaml -->
+- Datei: `compose.http.yaml` im Projektordner; lokal anlegen, committen und pushen.
+- Sie ergänzt `compose.deploy.yaml`; die Grunddatei bleibt unverändert.
+
+```yaml
+# Etappe A: API direkt über Port 80 – ohne Verschlüsselung, nur zur Demonstration.
+services:
+  db:
+    restart: unless-stopped
+
+  api:
+    restart: unless-stopped
+    environment:
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS}
+    # !override ersetzt die lokale Portliste vollständig, statt sie zu ergänzen.
+    ports: !override
+      - "80:8000"
+```
+
+| Eintrag | Bedeutung |
+| --- | --- |
+| Mehrere `-f`-Dateien | Compose führt sie der Reihe nach zusammen; spätere Werte gewinnen. |
+| `restart: unless-stopped` | Container starten nach Absturz oder VM-Neustart wieder. |
+| `ALLOWED_HOSTS` | Kommt aus `.env.deploy`; enthält die öffentliche IP. |
+| `"80:8000"` | VM-Port 80 auf allen Schnittstellen → Container-Port 8000. |
+
+```powershell
+# Lokal im Projektordner.
+git add compose.http.yaml .env.deploy.example
+git commit -m "HTTP-Zugang fuer Azure-VM ergaenzen"
 git push
 ```
 
-1. Im Railway-Projekt einen App-Dienst aus dem eigenen GitHub-Repository hinzufügen; Name `api`.
-2. Repository-Wurzel als Root Directory wählen: Dort liegt unser `Dockerfile`.
-3. Branch `main` verwenden. Einen eventuell sofort startenden Erstversuch bis zur Konfiguration nicht bewerten.
-4. **GitHub-Autodeploy für den Pflichtteil deaktivieren.** Weitere Veröffentlichungen lösen wir bewusst manuell aus.
-5. In den Build-Logs prüfen, dass Railway den `Dockerfile` verwendet.
+### 6.2 Auf der VM starten, migrieren, Demo einrichten
 
-- Railway baut aus dem GitHub-Stand ein neues Image. Das lokal gebaute Image wird dabei nicht automatisch hochgeladen.
-- Der Dienst wird erst nach Variablen, Migration und erfolgreichem Start geprüft.
+```bash
+# Auf der VM im Ordner hogwarts-api.
+git pull
+# Bash-Array: entspricht @deploy aus PowerShell.
+http=(--env-file .env.deploy -f compose.deploy.yaml -f compose.http.yaml)
 
-### 5.3 Variablen zuordnen
+docker compose "${http[@]}" config --quiet
+docker compose "${http[@]}" build api
+docker compose "${http[@]}" up -d --wait db
+docker compose "${http[@]}" run --rm api python -m alembic upgrade head
+docker compose "${http[@]}" run --rm api python -m alembic current
+docker compose "${http[@]}" run --rm api python -m tag13.prepare_demo
+docker compose "${http[@]}" up -d api
+docker compose "${http[@]}" ps
+curl -s http://127.0.0.1/health
+```
 
-- Diese Werte am **App-Dienst `api`** setzen; nicht bloß am MySQL-Dienst.
-- Die Referenzen über den Variableneditor auswählen; Dienstnamen sind relevant.
+- **Dieselben Schritte wie lokal – nur auf einem anderen Rechner.**
+- `config --quiet` meldet fehlende Variablen und YAML-Fehler, bevor etwas startet.
+- `run` veröffentlicht keine Ports; der kurzlebige Container blockiert Port 80 nicht.
+- Der erste Build dauert länger: Die VM lädt Python-Image und Pakete selbst.
 
-| Variable unserer App | Wert bei Dienstname `MySQL` |
+### 6.3 Port 80 freigeben und von außen prüfen
+
+1. Im Portal die VM öffnen → **Netzwerk** → **Regel für eingehenden Port hinzufügen**.
+2. Zielportbereich `80`, Protokoll `TCP`, Aktion **Zulassen**, Name `allow-http`.
+3. Speichern; die Regel greift nach wenigen Sekunden.
+
+```powershell
+# Alternative mit der Azure CLI.
+az vm open-port --resource-group rg-hogwarts --name vm-hogwarts --port 80 --priority 1010
+```
+
+- Im Browser `http://ÖFFENTLICHE-IP/health` und `/version` öffnen.
+- In der Tag-13-Collection eine Postman-Umgebung **Azure** anlegen: `base_url=http://ÖFFENTLICHE-IP`.
+- Passwortwerte auf das Demo-Passwort der VM setzen; Tokens und Berichtsreferenzen leeren.
+- Ordner 00 ausführen und `/version` prüfen.
+- **Lokale Tokens und lokale IDs gehören nicht zur Datenbank auf der VM.**
+
+### 6.4 Warum Etappe A nicht so bleibt
+
+- **Ohne TLS gehen Passwort und Bearer-Token im Klartext durchs Netz.**
+- Jeder Rechner auf dem Weg könnte mitlesen und das Token weiterverwenden.
+- Darum in Etappe A nur Demo-Konten verwenden und danach direkt zu Etappe B wechseln.
+- Denkfrage: Hilft hier Passwort-Hashing? **Nein. Hashing schützt die gespeicherten Passwörter, nicht die Übertragung.**
+
+## 7. Etappe B: HTTPS mit einem Caddy-Container
+
+- **Caddy ist ein Webserver, der als Reverse Proxy automatisch HTTPS einrichtet.**
+- Er beantragt beim Start ein Zertifikat bei Let's Encrypt und erneuert es selbst.
+- Ab jetzt ist nur noch Caddy öffentlich erreichbar. Die API hat keinen veröffentlichten Port mehr.
+
+### 7.1 DNS-Namen und Port 443 einrichten
+
+- **Let's Encrypt stellt Zertifikate für Domainnamen aus.** Wir nutzen den kostenlosen Azure-DNS-Namen.
+
+1. Im Portal die **öffentliche IP-Adresse** der VM öffnen → **Konfiguration**.
+2. **DNS-Namensbezeichnung** setzen, etwa `hogwarts-deinname`; speichern.
+3. Der vollständige Name lautet dann etwa `hogwarts-deinname.germanywestcentral.cloudapp.azure.com`.
+4. Unter **Netzwerk** eine weitere Eingangsregel für Port `443` (TCP) anlegen, Name `allow-https`.
+5. **Port 80 offen lassen.** Let's Encrypt prüft darüber die Domain, und Caddy leitet HTTP auf HTTPS um.
+
+```powershell
+# Prüfen, ob der Name auf die VM zeigt.
+Resolve-DnsName hogwarts-deinname.germanywestcentral.cloudapp.azure.com
+# Alternative zu Schritt 4 mit der Azure CLI.
+az vm open-port --resource-group rg-hogwarts --name vm-hogwarts --port 443 --priority 1020
+```
+
+- Auf der VM in `.env.deploy` `API_DOMAIN` auf diesen vollständigen Namen setzen.
+- Bei der Statischen-IP-Option (Standard-SKU) bleibt die Adresse auch nach einem Neustart gleich.
+
+### 7.2 Die Caddy-Konfiguration
+
+<!-- file: Caddyfile -->
+- Datei: `Caddyfile` im Projektordner; großer Anfangsbuchstabe, keine Endung.
+
+```caddyfile
+# {$API_DOMAIN} liest die Umgebungsvariable des Caddy-Containers.
+{$API_DOMAIN} {
+	# Alle Anfragen an den App-Container im Docker-Netzwerk weiterreichen.
+	reverse_proxy api:8000
+}
+```
+
+- **Drei Zeilen genügen: Domain, Ziel – und HTTPS ist eingeschaltet.**
+- Caddy setzt `X-Forwarded-For` und `X-Forwarded-Proto` für die App.
+- Der ursprüngliche `Host`-Header wird weitergereicht; `ALLOWED_HOSTS` muss die Domain enthalten.
+- Caddyfiles werden üblicherweise mit Tabulatoren eingerückt.
+
+### 7.3 Ergänzungsdatei für Caddy
+
+<!-- file: compose.caddy.yaml -->
+- Datei: `compose.caddy.yaml`; ersetzt in Etappe B die Datei `compose.http.yaml` beim Start.
+
+```yaml
+# Etappe B: Nur Caddy ist öffentlich; die API bleibt im Docker-Netzwerk.
+services:
+  db:
+    restart: unless-stopped
+
+  api:
+    restart: unless-stopped
+    environment:
+      ALLOWED_HOSTS: localhost,127.0.0.1,${API_DOMAIN:?Set API_DOMAIN}
+      # Weiterleitungsinformationen von Caddy vertrauen; die API ist von außen nicht erreichbar.
+      FORWARDED_ALLOW_IPS: "*"
+    # !reset entfernt jede Portveröffentlichung der API.
+    ports: !reset []
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:
+```
+
+| Eintrag | Bedeutung |
 | --- | --- |
-| `MYSQL_HOST` | `${{MySQL.RAILWAY_PRIVATE_DOMAIN}}` – privater Diensthostname. |
-| `MYSQL_PORT` | `3306` |
-| `MYSQL_USER` | `${{MySQL.MYSQL_USER}}` |
-| `MYSQL_PASSWORD` | `${{MySQL.MYSQL_PASSWORD}}` |
-| `MYSQL_DATABASE` | `${{MySQL.MYSQL_DATABASE}}` |
-| `API_DOCS` | `0` |
-| `DEMO_PASSWORD` | Ein neues langes Passwort nur für die Cloud-Demo. |
-| `FORWARDED_ALLOW_IPS` | `*` – nur für den hier kontrollierten Zugang über Railways Proxy. |
+| `ports: !reset []` | Die API hat keinen VM-Port mehr; nur Caddy erreicht sie unter `api:8000`. |
+| `FORWARDED_ALLOW_IPS` | Uvicorn wertet `X-Forwarded-Proto` von Caddy aus und erkennt `https`. |
+| `caddy_data` | Speichert Zertifikat und Schlüssel; überlebt Containerwechsel. |
+| `./Caddyfile:…:ro` | Die Konfiguration aus dem Repository, nur lesend eingebunden. |
 
-- **Eine Referenz übernimmt einen Wert vom anderen Dienst.** Das Root-Passwort wird der App nicht übergeben.
-- Diese Tabelle gehört zum hier selbst angelegten Image-Dienst; ein Railway-Datenbanktemplate kann andere Variablennamen verwenden.
-- Tag 12 leitet die Async-URL aus `tag7.db.url` ab; beide Treiber erhalten dieselben DB-Werte.
-- Keine Zugangsdaten in `Dockerfile`, `alembic.ini` oder GitHub eintragen.
-- `FORWARDED_ALLOW_IPS` lässt Uvicorn Weiterleitungsinformationen vertrauen, etwa dem ursprünglichen HTTPS-Protokoll.
+- **`FORWARDED_ALLOW_IPS="*"` ist nur sicher, weil die API keinen öffentlichen Port hat.**
 - Das ist keine Hostfreigabe. Der Platzhalter `*` gehört ausdrücklich nicht in `ALLOWED_HOSTS`.
+- `caddy_data` nicht löschen: Sonst beantragt Caddy neue Zertifikate; Let's Encrypt begrenzt wiederholte Anträge.
+- Vor dem Unterricht den aktuellen Patch-Stand des Caddy-Images prüfen und festschreiben.
 
-### 5.4 Domain, Hosts und Migration konfigurieren
-
-1. Beim App-Dienst unter Networking eine Railway-Domain erzeugen.
-2. Den tatsächlichen Hostnamen kopieren, etwa `hogwarts-api-xyz.up.railway.app`.
-3. `ALLOWED_HOSTS` auf `localhost,127.0.0.1,healthcheck.railway.app,DEIN-TATSAECHLICHER-HOSTNAME` setzen.
-4. Als Healthcheck-Pfad `/health` eintragen. Das Startkommando aus dem Dockerfile beibehalten.
-5. Beim ersten Deployment den folgenden **Pre-deploy Command** eintragen; beispielsweise 120 Sekunden Timeout einstellen.
-
-```sh
-sh -c "python -m alembic upgrade head && python -m tag13.prepare_demo"
+```powershell
+# Lokal im Projektordner.
+git add Caddyfile compose.caddy.yaml
+git commit -m "Caddy als HTTPS-Reverse-Proxy ergaenzen"
+git push
 ```
 
-- Diesen Befehl in Railway eintragen; er ist kein lokaler PowerShell-Aufruf.
-- `&&` startet das Einrichtungsprogramm nur nach erfolgreicher Migration.
-- **Pre-deploy läuft mit DB-Variablen und privatem Netzwerk vor dem Start der neuen App-Version.**
-- Scheitert ein Schritt, wird dieses Deployment nicht aktiviert. Keine interaktive Eingabe einbauen.
-- Der kurzlebige Pre-deploy-Container zählt nicht als dritter dauerhaft laufender Dienst.
-- `healthcheck.railway.app` ist der Hostname für Railways Startprüfung; unsere Middleware muss ihn annehmen.
+### 7.4 Auf der VM umschalten
 
-### 5.5 Ersten Stand veröffentlichen
+```bash
+cd ~/hogwarts-api
+git pull
+http=(--env-file .env.deploy -f compose.deploy.yaml -f compose.http.yaml)
+caddy=(--env-file .env.deploy -f compose.deploy.yaml -f compose.caddy.yaml)
 
-1. Die Konfigurationsänderungen anwenden und das Deployment starten.
-2. Build-, Pre-deploy- und Start-Logs nacheinander prüfen.
-3. Die erzeugte Adresse mit `https://` öffnen und `/health` sowie `/version` abrufen.
-4. Nach erfolgreicher Einrichtung den Pre-deploy-Befehl auf den folgenden Dauerzustand ändern.
-5. `DEMO_PASSWORD` aus den App-Variablen entfernen und die Konfigurationsänderungen anwenden.
-
-```sh
-python -m alembic upgrade head
+docker compose "${caddy[@]}" config --quiet
+# Etappe A beenden; ohne -v bleibt das MySQL-Volume erhalten.
+docker compose "${http[@]}" down
+docker compose "${caddy[@]}" up -d
+docker compose "${caddy[@]}" ps
+docker compose "${caddy[@]}" logs --tail 50 caddy
 ```
 
-- **Das spätere Entfernen von `DEMO_PASSWORD` löscht keine Benutzer. Ihre Passwort-Hashes liegen in MySQL.**
-- Der Seed wird jetzt nicht mehr ausgeführt. Migrationen bleiben Teil jedes Deployments.
-- `/health` ersetzt weder den Funktionscheck noch ein dauerhaftes Monitoring.
-- Die Railway-Startprüfung wird nach dem Deployment nicht automatisch zu einer laufenden Überwachung.
+- In den Caddy-Logs auf `certificate obtained successfully` achten; das dauert meist wenige Sekunden.
+- **Dieselbe Datenbank, dasselbe Volume:** Die Demo-Konten aus Etappe A sind weiterhin vorhanden.
+- Keine Migration nötig: Der Code hat sich nicht geändert.
 
-## 6. Cloud mit Postman nachweisen
+### 7.5 Mit Postman über HTTPS nachweisen
 
-- In der duplizierten **Tag-13-Collection** nur `base_url` zur tatsächlichen HTTPS-Adresse ändern.
-- Die beiden Passwortwerte auf das neue Cloud-Demo-Passwort setzen.
-- Tokens und Berichtsreferenzen aus dem lokalen Lauf leeren und in der Cloud neu anmelden.
-- **Lokale Tokens und lokale IDs gehören nicht automatisch zur Cloud-Datenbank.**
+- In der Postman-Umgebung **Azure** `base_url=https://hogwarts-deinname.germanywestcentral.cloudapp.azure.com` setzen.
+- Tokens und Berichtsreferenzen leeren und neu anmelden.
+- Zusätzlich `http://…` aufrufen: Caddy antwortet mit einer Umleitung auf `https://`.
 
 1. Ordner 00 ausführen; anschließend `/version` prüfen.
 2. Ordner 02 ausführen: gleiche Sync-/Async-Ergebnisse und eine zweite Seite.
@@ -648,13 +921,15 @@ Content-Type: application/json
 
 ### Was HTTPS hier leistet
 
-- HTTPS schützt die Übertragung zwischen Postman und dem öffentlichen Railway-Zugang.
-- Das Zertifikat wird durch Railway bereitgestellt und erneuert.
+- HTTPS schützt die Übertragung zwischen Postman und Caddy auf der VM.
+- Das Zertifikat stellt Let's Encrypt aus; Caddy beantragt und erneuert es automatisch.
+- Von Caddy zur App läuft HTTP – aber nur im Docker-Netzwerk derselben VM.
 - HTTPS ersetzt weder Passwort-Hashing noch Rollen oder Datensatzrechte.
 - Keine lokalen `mkcert`-Zertifikate und keine eigene Nginx-Konfiguration für diesen Deploymentweg nötig.
 - Eine HTTPS-Middleware kann einen TLS-Handshake auf einem reinen TLS-Port nicht nachträglich reparieren; das entsprechende Buchbeispiel übernehmen wir nicht.
+- Nach dem Wechsel die Demo-Passwörter aus Etappe A als bekannt betrachten; für echte Konten wären sie jetzt zu ersetzen.
 
-## 7. Eine Änderung veröffentlichen und Daten behalten
+## 8. Eine Änderung veröffentlichen und Daten behalten
 
 - In `tag13/main.py` nur `app.version` von `0.9.0` auf `0.9.1` ändern.
 - Frage vorab: An welchen Stellen ist die Änderung nach Speichern, Commit und Push schon vorhanden?
@@ -666,66 +941,92 @@ git commit -m "Version 0.9.1 fuer Cloud-Update markieren"
 git push
 ```
 
-1. `/version` in der Cloud erneut aufrufen: Bei deaktiviertem Autodeploy steht dort noch `0.9.0`.
-2. In Railway bewusst den **neuesten Commit von `main` deployen**; nicht nur das alte Deployment neu starten.
-3. Commit-Zuordnung und Logs prüfen; danach muss `/version` `0.9.1` liefern.
+1. `/version` in der Cloud erneut aufrufen: Dort steht noch `0.9.0`. **Die VM holt Änderungen nicht von selbst.**
+2. Auf der VM den neuen Stand holen, das Image neu bauen, migrieren und die API ersetzen:
+
+```bash
+cd ~/hogwarts-api
+git pull
+caddy=(--env-file .env.deploy -f compose.deploy.yaml -f compose.caddy.yaml)
+docker compose "${caddy[@]}" build api
+docker compose "${caddy[@]}" run --rm api python -m alembic upgrade head
+docker compose "${caddy[@]}" up -d
+docker compose "${caddy[@]}" ps
+```
+
+3. `/version` muss jetzt `0.9.1` liefern; `git log --oneline -1` auf der VM zeigt den passenden Commit.
 4. Den zuvor angelegten Kurs über die notierte ID erneut lesen.
 5. Ordner 04 ausführen und die Tokens abmelden.
 
 - **Neuer App-Container, weiterhin dieselbe Datenbank und dasselbe Volume.**
-- Ein Neustart startet vorhandenen Code neu; ein Deployment kann neuen Code bereitstellen.
+- `up -d` ersetzt nur Container, deren Image oder Konfiguration sich geändert hat; MySQL und Caddy laufen weiter.
+- Ein Neustart (`restart`) startet vorhandenen Code neu; erst Build und `up` stellen neuen Code bereit.
 - Ein App-Rollback setzt Datenbankmigrationen nicht automatisch zurück.
 - Tabellenänderungen deshalb prüfen und mit alten/neuen App-Versionen verträglich planen.
 
-### Lokal sauber beenden
+### Sauber beenden und Kosten vermeiden
 
 ```powershell
+# Lokal: Container stoppen; das benannte Datenbank-Volume bleibt bestehen.
 docker compose @deploy down
-# Das benannte Datenbank-Volume bleibt bestehen.
-# Kein --volumes bzw. -v ergänzen, wenn die Daten erhalten bleiben sollen.
 ```
 
-- Auch Cloud-Dienste können nach dem Unterricht weiter Kosten verursachen. Einen bewussten Endzeitpunkt festlegen.
-- Ein Volume ist dauerhafter Speicher, aber kein Backup.
+```powershell
+# Azure: VM freigeben – keine Rechenkosten mehr, Festplatte und IP bleiben.
+az vm deallocate --resource-group rg-hogwarts --name vm-hogwarts
+# Später wieder starten; dank restart: unless-stopped laufen die Container von selbst an.
+az vm start --resource-group rg-hogwarts --name vm-hogwarts
+# Nach dem Kurs: alles in der Ressourcengruppe endgültig löschen – auch die Datenbank.
+az group delete --name rg-hogwarts
+```
 
-## 8. Fehlersuche und Transfer
+- **Nur „Beenden“ im Betriebssystem reicht nicht.** Erst „Beenden (Zuordnung aufheben)“ bzw. `deallocate` stoppt die Rechenkosten.
+- Festplatte und statische öffentliche IP kosten auch im freigegebenen Zustand eine kleine Gebühr.
+- Ein Volume auf der VM-Festplatte ist dauerhafter Speicher, aber kein Backup.
+
+## 9. Fehlersuche und Transfer
 
 ### Von außen nach innen prüfen
 
 | Beobachtung | Zuerst prüfen |
 | --- | --- |
-| Imagebau scheitert | Dockerfile, Requirements-Dateien, Installationsfehler in Build-Logs. |
-| App startet nicht | Importpfad, gesetzte DB-Variablen und Start-Logs. |
-| Railway erreicht die App nicht | Bindung `0.0.0.0`, `PORT` und Domain-Zielport. |
-| `400 Invalid host header` | Tatsächlicher Domainname und Healthcheck-Host in `ALLOWED_HOSTS`. |
-| Migration scheitert | MySQL bereit? Privater Host? Passwort? Richtige Datenbank? |
+| `ssh` hängt oder bricht ab | NSG-Regel für Port 22, Quell-IP-Einschränkung, richtige öffentliche IP. |
+| `permission denied … docker.sock` | Nach `usermod -aG docker` ab- und neu angemeldet? |
+| Imagebau scheitert | Dockerfile, Requirements-Dateien, Installationsfehler; VM-Arbeitsspeicher. |
+| App startet nicht | `docker compose … logs api`: Importpfad, gesetzte DB-Variablen. |
+| Browser: Zeitüberschreitung | NSG-Regel für Port 80/443, `docker compose … ps`, Portzuordnung. |
+| `400 Invalid host header` | Tatsächliche IP bzw. Domain in `ALLOWED_HOSTS`; Container danach neu erzeugt? |
+| Caddy erhält kein Zertifikat | DNS-Name zeigt auf die VM? Port 80 **und** 443 offen? `API_DOMAIN` gesetzt? |
+| `502 Bad Gateway` von Caddy | API-Container läuft? Ziel im Caddyfile genau `api:8000`? |
+| Migration scheitert | MySQL bereit? Host `db`? Passwort? Richtige Datenbank? |
 | `401` beim Bericht | Frischer Cloud-Login, gültiges Token, Header. |
 | `403` oder leerer Bericht | Rolle, Kurszuordnung und vorhandener Berichtstag. |
-| Nach Push bleibt alte Version | Autodeploy ist im Pflichtteil aus; neuesten Commit manuell veröffentlichen. |
+| Nach Push bleibt alte Version | Auf der VM `git pull`, `build` und `up -d` ausgeführt? |
 
 - **Statuscode, konkrete Anfrage und passende Logs zusammen betrachten.**
-- Keine Passwörter, Tokens oder vollständigen DB-URLs in Screenshots und geteilte Exporte aufnehmen.
+- Keine Passwörter, Tokens, `.env.deploy`-Inhalte oder privaten SSH-Schlüssel in Screenshots und geteilte Exporte aufnehmen.
 
 ### Kurze Transferaufträge
 
 | Auftrag | Nachweis | Besprechung für Dozenten |
 | --- | --- | --- |
-| Eine neue Versionsnummer veröffentlichen. | Neuer Commit, neues Deployment, passende `/version`-Antwort. | Die laufende Version muss zum deployten Commit passen. |
+| Eine neue Versionsnummer veröffentlichen. | Neuer Commit, neues Image, passende `/version`-Antwort. | Die laufende Version muss zum Commit auf der VM passen. |
 | Einen anderen erlaubten Kurstitel anlegen und nach dem Update lesen. | Gleiche ID und gleicher Titel vor/nach dem App-Update. | Codewechsel und Datenspeicherung sind getrennt. |
-| Erklären, weshalb `MYSQL_HOST=127.0.0.1` im App-Container falsch ist. | Aufbau mit zwei Containern aufzeichnen. | Die Loopback-Adresse zeigt auf den jeweiligen Container. |
+| Erklären, weshalb `MYSQL_HOST=127.0.0.1` im App-Container falsch ist. | Aufbau mit drei Containern aufzeichnen. | Die Loopback-Adresse zeigt auf den jeweiligen Container. |
+| Erklären, warum die API in Etappe B keinen Port mehr veröffentlicht. | `docker compose … ps` zeigt nur Caddy mit 80/443. | Sonst ließe sich Caddy und damit HTTPS umgehen. |
 | Ein Schüler erhält 403. Liegt es an Docker? | Rolle und Zuständigkeit anhand eines Requests prüfen. | Ein erreichbarer Dienst kann fachlich korrekt ablehnen. |
 
-- Abschließende Frage: Welche Daten gehören zu Git, zum Image, zu Variablen und zum Volume?
-- Pflicht abgeschlossen, wenn der Cloud-Kurs nach einem App-Update weiter abrufbar ist.
+- Abschließende Frage: Welche Daten gehören zu Git, zum Image, zu `.env.deploy` und zum Volume?
+- Pflicht abgeschlossen, wenn der Cloud-Kurs nach einem App-Update über HTTPS weiter abrufbar ist.
 
-## 9. Bonus: GitHub Actions und automatisches Deployment
+## 10. Bonus: GitHub Actions und automatisches Deployment
 
 - **CI prüft Änderungen automatisch; CD veröffentlicht einen geprüften Stand.**
-- GitHub Actions übernimmt CI. Railway übernimmt anschließend das Deployment.
-- Wir verwenden eine einzige Cloud-Umgebung `production`; eine getrennte Staging-Umgebung entfällt aus Kostengründen.
+- GitHub Actions übernimmt beides: erst Tests, danach die Befehle aus Abschnitt 8 per SSH auf der VM.
+- Wir verwenden eine einzige Cloud-Umgebung; eine getrennte Staging-VM entfällt aus Kostengründen.
 - Staging wäre eine zusätzliche Prüf-Umgebung vor Produktion, nicht bloß ein anderer Name derselben laufenden Umgebung.
 
-### 9.1 Bereitgestellter CI-Workflow
+### 10.1 Bereitgestellter CI-Workflow
 
 - Datei: `.github/workflows/ci.yml`; als fertiges Werkzeug übernehmen.
 - Voraussetzung: vorhandenes `compose.test.yaml`, `tag8.init_test_db` und Tag-12-Tests liegen im Repository.
@@ -785,56 +1086,98 @@ jobs:
 
 - Diese Passwörter gelten ausschließlich für den kurzlebigen CI-Testcontainer.
 - `--volumes` ist hier absichtlich: Die CI-Testdaten werden verworfen.
-- Der Workflow prüft die bekannten Tag-12-Funktionen und den Imagebau; er startet keine öffentliche Cloud-App.
-- Der Postman-Cloudcheck bleibt erforderlich: Domain, Railway-Variablen und tatsächliche Erreichbarkeit sind damit noch nicht geprüft.
+- Der Workflow prüft die bekannten Tag-12-Funktionen und den Imagebau; er verändert die VM noch nicht.
+- Der Postman-Cloudcheck bleibt erforderlich: DNS, Zertifikat, Variablen und Erreichbarkeit sind damit noch nicht geprüft.
 
-### 9.2 Railway erst nach erfolgreicher CI deployen lassen
+### 10.2 Nach erfolgreicher CI die VM aktualisieren
 
-1. Workflow committen und pushen; den erfolgreichen Lauf unter GitHub → Actions öffnen.
-2. Für den App-Dienst GitHub-Autodeploy auf `main` aktivieren.
-3. **Wait for CI aktivieren**, damit Railway auf die GitHub-Prüfungen wartet.
-4. Eine neue Versionsnummer pushen und den Ablauf bis zur `/version`-Antwort beobachten.
-5. In einem weiteren Commit absichtlich einen bekannten Test fehlschlagen lassen; zeigen, dass dieser Stand nicht veröffentlicht wird. Danach reparieren.
+1. Lokal ein **eigenes** Schlüsselpaar nur für GitHub erzeugen: `ssh-keygen -t ed25519 -f "$HOME\.ssh\hogwarts_deploy"`; Passphrase leer lassen, da GitHub ohne Eingabe arbeitet.
+2. Den Inhalt von `hogwarts_deploy.pub` auf der VM an `~/.ssh/authorized_keys` anhängen.
+3. Lokal `ssh-keyscan -t ed25519 ÖFFENTLICHE-IP` ausführen; die ausgegebene Zeile ist der Wert für `VM_KNOWN_HOSTS`. Zur Kontrolle auf der VM `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` mit dem Fingerprint vergleichen.
+4. Im GitHub-Repository unter **Settings → Secrets and variables → Actions** anlegen: `VM_HOST`, `VM_USER` (`azureuser`), `VM_SSH_KEY` (Inhalt von `hogwarts_deploy`), `VM_KNOWN_HOSTS`.
+5. Den folgenden Job in `.github/workflows/ci.yml` unter `jobs:` ergänzen, committen und pushen.
 
-- Keine eigene Deploy-API und kein Railway-Token in Actions nötig für diesen Weg.
-- Migrationen bleiben im Pre-deploy Command; CI greift niemals auf die Produktionsdatenbank zu.
-- In einer echten Produktion kämen unter anderem Backup-/Wiederherstellungskonzept und Betriebsüberwachung hinzu.
+<details>
+<summary>Bereitgestellter Code: Deploy-Job für .github/workflows/ci.yml</summary>
+
+```yaml
+  deploy:
+    # Nur nach erfolgreichen Tests und nur für Pushes auf main.
+    needs: tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency: production
+    steps:
+      - name: SSH-Zugang vorbereiten
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.VM_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: VM aktualisieren
+        run: |
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" bash -s <<'SH'
+          set -euo pipefail
+          cd ~/hogwarts-api
+          git pull --ff-only
+          caddy=(--env-file .env.deploy -f compose.deploy.yaml -f compose.caddy.yaml)
+          docker compose "${caddy[@]}" build api
+          docker compose "${caddy[@]}" run --rm api python -m alembic upgrade head
+          docker compose "${caddy[@]}" up -d
+          SH
+```
+
+</details>
+
+6. Eine neue Versionsnummer pushen und den Ablauf unter GitHub → Actions bis zur `/version`-Antwort beobachten.
+7. In einem weiteren Commit absichtlich einen bekannten Test fehlschlagen lassen; zeigen, dass `deploy` übersprungen wird. Danach reparieren.
+
+- `needs: tests` ist die Sperre: **Ohne grüne Tests wird nichts veröffentlicht.**
+- `concurrency` verhindert zwei gleichzeitige Deployments auf dieselbe VM.
+- GitHub-Runner haben wechselnde IP-Adressen; SSH muss dafür aus dem Internet erreichbar sein – nur per Schlüssel, nie per Passwort.
+- Migrationen laufen auf der VM; die Tests greifen niemals auf die Produktionsdatenbank zu.
+- In einer echten Produktion kämen unter anderem Backup-/Wiederherstellungskonzept, Betriebssystem-Updates und Überwachung hinzu.
 
 ## Anhang: Quellen und Abgrenzung
 
 | Cookbook-Abschnitt | Verwendung für Tag 13 |
 | --- | --- |
 | Running the server with the FastAPI CLI | Startprinzip übernehmen; beim bekannten Uvicorn bleiben. |
-| Enabling HTTPS on FastAPI applications | Zweck von HTTPS erklären; Zertifikat durch Railway. |
+| Enabling HTTPS on FastAPI applications | Zweck von HTTPS erklären; Zertifikat über Caddy und Let's Encrypt. |
 | Running FastAPI applications in Docker containers | Dockerfile, Build und Container auf unsere App übertragen. |
 | Running the server across multiple workers | Nur einordnen; keine zusätzliche Gunicorn-Übung. |
-| Deploying your FastAPI application on the cloud | Railway/GitHub übernehmen; Dockerfile statt zusätzlichem Procfile. |
+| Deploying your FastAPI application on the cloud | Azure-VM mit Docker Compose statt Plattformdienst; kein Procfile. |
 | Shipping FastAPI applications with Hatch | Auslassen; keine Paketveröffentlichung für dieses Lernziel nötig. |
 
-- Eigene Ergänzungen: Git-Einstieg, MySQL-Volume, Hostkonfiguration, Migrationen, Beispieldaten und Postman-Nachweise.
-- Providerdetails mit offizieller Dokumentation abgeglichen: **25. Oktober 2026**. UI-Bezeichnungen können sich ändern.
-- [Dockerfile-Referenz][dockerfile], [Compose][compose], [FastAPI in Containern][fastapi-docker].
-- [Railway Dockerfiles][railway-docker], [MySQL][railway-mysql], [Pre-deploy][railway-predeploy].
-- [Eigener Datenbankdienst][railway-db-service], [privates Netzwerk][railway-private] und [offizielles MySQL-Image][mysql-image].
-- [Railway HTTPS][railway-https], [Healthchecks][railway-health], [GitHub-Autodeploy und Wait for CI][railway-ci].
+- Eigene Ergänzungen: Git-Einstieg, MySQL-Volume, Hostkonfiguration, Migrationen, Beispieldaten, VM-Einrichtung, Caddy und Postman-Nachweise.
+- Stand der Beschreibung: **Oktober 2026**. Portal-Bezeichnungen, Image-Versionen und VM-Größen vor dem Unterricht prüfen.
+- [Dockerfile-Referenz][dockerfile], [Compose][compose], [Zusammenführen von Compose-Dateien][compose-merge], [FastAPI in Containern][fastapi-docker].
+- [Linux-VM im Azure-Portal][azure-vm-portal], [Linux-VM mit der Azure CLI][azure-vm-cli], [DNS-Name für die VM][azure-fqdn], [Netzwerksicherheitsgruppen][azure-nsg].
+- [Docker Engine auf Ubuntu][docker-ubuntu], [Docker ohne sudo][docker-postinstall] und [offizielles MySQL-Image][mysql-image].
+- [Caddy als Reverse Proxy][caddy-proxy], [automatisches HTTPS][caddy-https] und [Caddy-Image][caddy-image].
 - [FastAPI hinter einem Proxy][proxy] erklärt die Weiterleitungsinformationen.
-- Bonuswerkzeuge: [Checkout][checkout] und [Setup Python][setup-python].
+- Bonuswerkzeuge: [Checkout][checkout], [Setup Python][setup-python] und [GitHub-Secrets][gh-secrets].
 
 [tag12]: 12-Async_in_APIs.md
 [postman12]: ../postman/12-Tag12-Hogwarts.postman_collection.json
 [cookbook]: ../../fastAPI_cookbook/16-chapter-12-deploying-and-managing-fastapi-applications.md
 [dockerfile]: https://docs.docker.com/reference/dockerfile/
 [compose]: https://docs.docker.com/compose/
+[compose-merge]: https://docs.docker.com/reference/compose-file/merge/
 [fastapi-docker]: https://fastapi.tiangolo.com/deployment/docker/
-[railway-docker]: https://docs.railway.com/builds/dockerfiles
-[railway-mysql]: https://docs.railway.com/databases/mysql
-[railway-db-service]: https://docs.railway.com/databases/build-a-database-service
-[railway-private]: https://docs.railway.com/networking/private-networking
+[azure-vm-portal]: https://learn.microsoft.com/azure/virtual-machines/linux/quick-create-portal
+[azure-vm-cli]: https://learn.microsoft.com/azure/virtual-machines/linux/quick-create-cli
+[azure-fqdn]: https://learn.microsoft.com/azure/virtual-machines/create-fqdn
+[azure-nsg]: https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview
+[docker-ubuntu]: https://docs.docker.com/engine/install/ubuntu/
+[docker-postinstall]: https://docs.docker.com/engine/install/linux-postinstall/
 [mysql-image]: https://github.com/docker-library/docs/blob/master/mysql/README.md
-[railway-predeploy]: https://docs.railway.com/deployments/pre-deploy-command
-[railway-https]: https://docs.railway.com/networking/public-networking
-[railway-health]: https://docs.railway.com/deployments/healthchecks
-[railway-ci]: https://docs.railway.com/deployments/github-autodeploys
+[caddy-proxy]: https://caddyserver.com/docs/quick-starts/reverse-proxy
+[caddy-https]: https://caddyserver.com/docs/automatic-https
+[caddy-image]: https://hub.docker.com/_/caddy
 [proxy]: https://fastapi.tiangolo.com/advanced/behind-a-proxy/
 [checkout]: https://github.com/actions/checkout
 [setup-python]: https://github.com/actions/setup-python
+[gh-secrets]: https://docs.github.com/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions
