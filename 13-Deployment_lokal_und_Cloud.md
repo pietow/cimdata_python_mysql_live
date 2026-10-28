@@ -679,15 +679,36 @@ git log --oneline -1
 - Privates Repository: einen schreibgeschützten **Deploy Key** für dieses Repository verwenden; kein persönliches Passwort auf der VM speichern.
 - **Die VM holt den Code von GitHub. Das lokal gebaute Image wird nicht übertragen.**
 
+#### Pflichtschritt: `.env.deploy` auf der VM anlegen und ausfüllen
+
+- **Ohne ausgefüllte `.env.deploy` startet auf der VM nichts.**
+- Die Datei ist **nicht** im Repository: `.gitignore` schließt sie aus, damit keine Passwörter auf GitHub landen.
+- `git clone` bringt deshalb nur die Vorlage `.env.deploy.example` mit. Die echte Datei legen wir auf der VM selbst an.
+- Fehlt eine Variable, bricht Compose ab, z. B. mit `Set MYSQL_PASSWORD` oder `Set ALLOWED_HOSTS`.
+
 ```bash
+# Auf der VM im Ordner hogwarts-api.
 cp .env.deploy.example .env.deploy
 chmod 600 .env.deploy
+
+# Hilfe: drei zufällige Passwörter erzeugen und je eines kopieren.
+openssl rand -base64 24
+openssl rand -base64 24
+openssl rand -base64 24
+
 nano .env.deploy
 ```
 
+| Variable | Was eintragen? |
+| --- | --- |
+| `MYSQL_PASSWORD` | Neues Passwort für den App-Benutzer der Datenbank. |
+| `MYSQL_ROOT_PASSWORD` | Anderes neues Passwort für den MySQL-Root-Benutzer. |
+| `DEMO_PASSWORD` | Drittes neues Passwort für die Demo-Konten. |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1,` und dahinter die **öffentliche IP der VM**. |
+| `API_DOMAIN` | Bleibt bis Etappe B ein Platzhalter. |
+
 - **Neue Passwörter nur für die VM wählen.** Nicht die lokalen Werte wiederverwenden.
-- `ALLOWED_HOSTS`: `localhost,127.0.0.1,` gefolgt von der öffentlichen IP der VM.
-- `API_DOMAIN` bleibt bis Etappe B ein Platzhalter.
+- **Das MySQL-Passwort nach dem ersten Start nicht mehr ändern.** MySQL übernimmt es nur beim ersten Anlegen des Volumes.
 
 So sieht `.env.deploy` auf der VM danach aus (Beispiel-IP `20.79.155.100`):
 
@@ -706,6 +727,17 @@ API_DOMAIN=REPLACE_WITH_DNS_NAME
 - `localhost` und `127.0.0.1` bleiben drin: `curl http://127.0.0.1/health` auf der VM selbst soll weiter funktionieren.
 - In `nano`: Speichern mit `Strg+O`, Enter; Beenden mit `Strg+X`.
 - `chmod 600` erlaubt nur dem eigenen Benutzer das Lesen der Datei.
+
+```bash
+# Kontrolle: Gibt diese Zeile etwas aus, ist noch ein Platzhalter übrig.
+grep -n "REPLACE_WITH" .env.deploy | grep -v API_DOMAIN
+# Die Datei darf in git status nicht auftauchen.
+git status --short
+```
+
+- **Keine Ausgabe bei `grep`** = alle Pflichtwerte sind ersetzt.
+- Taucht `.env.deploy` in `git status` auf, wird sie versioniert. Dann nicht committen, sondern `.gitignore` prüfen.
+- Die Datei bleibt bei `git pull` erhalten. Sie muss nur einmal pro VM angelegt werden.
 
 ## 6. Etappe A: veröffentlichen ohne SSL
 
