@@ -1,0 +1,714 @@
+{
+  "info": {
+    "name": "Tag 12 - Hogwarts: Async in APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Tag-12-Backend auf Port 8000; öffentlicher Demo-Dienst auf 8001. Der eigenständige Konsolenclient tag12/notices.py lädt die Hinweise nacheinander oder nebenläufig. Ordner 01 prüft nur die einzelnen Backend-Antworten. Vormittags: Demo-Ordner im Performance-Modus lokal mit einem Worker, Fixed und 5 virtuellen Nutzern ausführen; pro Lauf nur eine Waiting-Route auswählen. Nachmittags: Ordner 00 bis 03 ausführen; Ordner 04 erst nach den Übungen. Lokale Passwörter eintragen. report_date muss eigene Buchungen von Vector enthalten. Tokens, Passwörter und gespeicherte Antworten vor Export leeren."
+  },
+  "variable": [
+    {
+      "key": "demo_base_url",
+      "value": "http://127.0.0.1:8001",
+      "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "report_date",
+      "value": "1993-09-01",
+      "type": "string"
+    },
+    {
+      "key": "vector_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vector_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reader_username",
+      "value": "babbling",
+      "type": "string"
+    },
+    {
+      "key": "reader_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reader_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "report_reference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "second_reference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "report_after_id",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "reference_day",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Demo - Threads und Async vergleichen",
+      "description": "Abschnitt 2 des Dozentenskripts. Öffentliche Demo-Routen auf Port 8001, ohne Anmeldung. Jede Route wartet 0,4 s. Einzelnes Send: jeweils ungefähr gleiche Wartezeit. Nebenläufigkeit: Run > Performance, lokal/App, Fixed, 5 virtuelle Nutzer, 1 Minute. Pro Lauf NUR EINEN der drei Requests auswählen; für die anderen Varianten getrennt wiederholen. Durchsatz (Requests/s) und Antwortzeit vergleichen. Blocking: weniger Durchsatz; thread und cooperative: höherer, oft ähnlicher Durchsatz. Der normale funktionale Runner sendet nacheinander. Der Performance-Modus wiederholt Anfragen während der Testdauer, statt nur fünf Anfragen einmal zu senden. Keine Auth-, Berichts- oder Bonus-Requests mitmessen. Ein Worker, kein Reload. Diese kleine Demo zeigt noch keine Threadpool-Grenze.",
+      "item": [
+        {
+          "name": "Blocking: Event Loop blockiert",
+          "request": {
+            "method": "GET",
+            "url": "{{demo_base_url}}/waiting/blocking",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "description": "async def mit time.sleep(0.4). Blockiert den Event Loop des Demo-Dienstes. Für den Performance-Vergleich nur diesen Request auswählen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 und Modus blocking', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.deep.eql({mode: 'blocking'});",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Thread: Warten im Threadpool",
+          "request": {
+            "method": "GET",
+            "url": "{{demo_base_url}}/waiting/thread",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "description": "def mit time.sleep(0.4). Jeder laufende Aufruf belegt einen Threadpool-Platz. Für den Performance-Vergleich nur diesen Request auswählen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 und Modus thread', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.deep.eql({mode: 'thread'});",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cooperative: Warten gibt Event Loop frei",
+          "request": {
+            "method": "GET",
+            "url": "{{demo_base_url}}/waiting/cooperative",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "description": "async def mit await asyncio.sleep(0.4). Während eine Task wartet, kann der Event Loop andere Tasks bearbeiten. Für den Performance-Vergleich nur diesen Request auswählen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 und Modus cooperative', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.deep.eql({mode: 'cooperative'});",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "00 - Anmeldung",
+      "item": [
+        {
+          "name": "Healthcheck",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "vector: anmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"vector\",\n  \"password\": \"{{vector_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Bearer-Token vorhanden', () => {",
+                  "    pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "  });",
+                  "  pm.collectionVariables.set('vector_token', body.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "reader: anmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{reader_username}}\",\n  \"password\": \"{{reader_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Bearer-Token vorhanden', () => {",
+                  "    pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "  });",
+                  "  pm.collectionVariables.set('reader_token', body.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Öffentliche Hinweise des Demo-Dienstes",
+      "item": [
+        {
+          "name": "Raumhinweis",
+          "request": {
+            "method": "GET",
+            "url": "{{demo_base_url}}/rooms",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 und erwarteter Hinweis', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.text()).to.eql(\"Arithmantik: Raumplan im Sekretariat beachten.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Materialhinweis",
+          "request": {
+            "method": "GET",
+            "url": "{{demo_base_url}}/materials",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 und erwarteter Hinweis', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.text()).to.eql(\"Arithmantik: Lehrbuch und Pergament mitbringen.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Einzelne Backend-Endpunkte auf Port 8001 prüfen, ohne Anmeldung. Die Zusammenfassung und der Vergleich nacheinander/nebenläufig laufen im getrennten Konsolenclient: python -m tag12.notices. Hier gibt es keine zusätzliche Zusammenfassungsroute."
+    },
+    {
+      "name": "02 - Berichte vergleichen",
+      "item": [
+        {
+          "name": "Sync: erste Seite als Referenz",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&limit=2&after_id=0",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const rows = pm.response.json();",
+                  "  pm.test('Nichtleerer Berichtstag, höchstens zwei Zeilen', () => {",
+                  "    pm.expect(rows.length).to.be.within(1, 2);",
+                  "  });",
+                  "  pm.collectionVariables.set('report_reference',",
+                  "    JSON.stringify(rows));",
+                  "  pm.collectionVariables.set('reference_day',",
+                  "    pm.collectionVariables.get('report_date'));",
+                  "  pm.collectionVariables.set('report_after_id',",
+                  "    rows.length ? String(rows[rows.length - 1].id) : '0');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Async: erste Seite vergleichen",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings?booking_date={{report_date}}&limit=2&after_id=0",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Gleicher Tag und vollständige Antwort', () => {",
+                  "    pm.expect(pm.collectionVariables.get('reference_day'))",
+                  "      .to.eql(pm.collectionVariables.get('report_date'));",
+                  "    const rows = pm.response.json();",
+                  "    pm.expect(rows.length).to.be.greaterThan(0);",
+                  "    pm.expect(rows).to.deep.eql(JSON.parse(",
+                  "      pm.collectionVariables.get('report_reference')));",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync: zweite Seite als Referenz",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/bookings?booking_date={{report_date}}&limit=2&after_id={{report_after_id}}",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('second_reference',",
+                  "    JSON.stringify(pm.response.json()));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Async: zweite Seite vergleichen",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings?booking_date={{report_date}}&limit=2&after_id={{report_after_id}}",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Gleiche zweite Seite ohne wiederholte IDs', () => {",
+                  "    const rows = pm.response.json();",
+                  "    pm.expect(rows).to.deep.eql(JSON.parse(",
+                  "      pm.collectionVariables.get('second_reference')));",
+                  "    const first = JSON.parse(",
+                  "      pm.collectionVariables.get('report_reference'));",
+                  "    const ids = first.map(row => row.id);",
+                  "    pm.expect(rows.every(row => !ids.includes(row.id))).eql(true);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Rechte und Eingaben",
+      "item": [
+        {
+          "name": "Bericht ohne Token",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings?booking_date={{report_date}}&limit=2&after_id=0",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "if (pm.response.code === 401) {",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bericht mit reader",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings?booking_date={{report_date}}&limit=2&after_id=0",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{reader_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "if (pm.response.code === 403) {",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "limit zu groß",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings?booking_date={{report_date}}&limit=51",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "if (pm.response.code === 422) {",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Datum fehlt",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "if (pm.response.code === 422) {",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative Fortsetzungs-ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/async/reports/bookings?booking_date={{report_date}}&after_id=-1",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "if (pm.response.code === 422) {",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Abmelden",
+      "item": [
+        {
+          "name": "vector: abmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{vector_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => {",
+                  "  pm.response.to.have.status(204);",
+                  "});",
+                  "if (pm.response.code === 204) {",
+                  "  pm.collectionVariables.set('vector_token', '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "reader: abmelden",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{reader_token}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => {",
+                  "  pm.response.to.have.status(204);",
+                  "});",
+                  "if (pm.response.code === 204) {",
+                  "  pm.collectionVariables.set('reader_token', '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
