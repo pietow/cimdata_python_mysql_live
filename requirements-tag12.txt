@@ -1,0 +1,5 @@
+-r requirements-tag9.txt
+SQLAlchemy[asyncio]==2.0.54
+aiomysql[rsa]==0.3.2
+httpx==0.28.1
+pytest-asyncio==1.4.0
