@@ -1,0 +1,40 @@
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: hogwarts
+      MYSQL_USER: hogwarts_app
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+    volumes:
+      - hogwarts_deploy_data:/var/lib/mysql
+    # Werkzeug: Erst weitergehen, wenn der App-Benutzer SQL ausführen kann.
+    # $$ reicht das Dollarzeichen an die Shell IM Container weiter.
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql --protocol=TCP -h127.0.0.1 -u$$MYSQL_USER -D$$MYSQL_DATABASE -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  api:
+    build: .
+    image: hogwarts-api:tag13
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: hogwarts
+      MYSQL_USER: hogwarts_app
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      API_DOCS: "0"
+      PORT: "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  hogwarts_deploy_data:
